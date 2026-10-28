@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.10.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.10.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -84,6 +84,7 @@ Estructura de la carpeta de la app:
 2. **Revisión:**
    - Resumen del lote y avisos.
    - Grilla editable: Cargar, Proveedor, fechas, N° de tarea, Servicio y Monto. Colores: amarillo = posible duplicado, rojo = frenada, violeta = leída por Claude.
+     - Las columnas tienen ancho fijo y no se achican: los encabezados siempre se leen (y muestran el nombre al pasar el mouse); si la ventana es angosta, la grilla se desplaza hacia el costado. Proveedor y Servicio usan el espacio que sobra y muestran el texto completo al pasar el mouse.
      - Editar **Proveedor** de un proveedor nuevo lo cambia en todo: carpeta, línea de `proveedores.csv`, links y filas de todas sus facturas del lote. Uno ya registrado no se cambia acá (avisa que se corrige en `proveedores.csv`).
      - Editar **Monto**: en Factura B, C o no fiscal H sigue en 0; en Factura A, H vuelve a la fórmula (el IVA leído era del monto anterior) y lo avisa.
    - Secciones de lo que no se carga, los proveedores nuevos y los archivos que se mueven.

@@ -13,3 +13,13 @@ def test_quitar_subidos(tmp_path, monkeypatch):
     assert ui.quitar_subidos() == (2, 0)
     assert not [f for f in sub.rglob("*") if f.is_file()]
     assert ui.quitar_subidos() == (0, 0)
+
+
+def test_columnas_de_la_grilla_no_se_achican():
+    """The review grid keeps every fixed width as its minimum (squeezed headers were unreadable)."""
+    for c in ui.COLUMNAS:
+        assert c["headerTooltip"] == c["headerName"]
+        if "width" in c:
+            assert c["minWidth"] == c["width"]
+        else:
+            assert c["minWidth"] >= 190 and c.get("flex")

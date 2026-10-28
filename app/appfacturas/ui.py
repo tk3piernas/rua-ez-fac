@@ -236,23 +236,28 @@ def filas_grid(lote) -> list[dict]:
     return out
 
 
-COLUMNAS = [
+def _columnas(cols: list[dict]) -> list[dict]:
+    """Every fixed width is also its minimum; every header shows its full name on hover."""
+    return [{**c, **({"minWidth": c["width"]} if "width" in c else {}), "headerTooltip": c["headerName"]} for c in cols]
+
+
+COLUMNAS = _columnas([
     {"field": "incluir", "headerName": "Cargar", "width": 85, ":editable": "params => !params.data.bloquea",
      "cellDataType": "boolean"},
-    {"field": "area", "headerName": "Área", "width": 95},
-    {"field": "proveedor", "headerName": "Proveedor", "editable": True, "minWidth": 170, "flex": 1},
-    {"field": "factura", "headerName": "Factura", "width": 190},
-    {"field": "fecha", "headerName": "Fecha servicio", "editable": True, "width": 120},
-    {"field": "vto", "headerName": "Vencimiento", "editable": True, "width": 120,
+    {"field": "area", "headerName": "Área", "width": 105},
+    {"field": "proveedor", "headerName": "Proveedor", "editable": True, "minWidth": 190, "flex": 1, "tooltipField": "proveedor"},
+    {"field": "factura", "headerName": "Factura", "width": 190, "tooltipField": "factura"},
+    {"field": "fecha", "headerName": "Fecha servicio", "editable": True, "width": 115},
+    {"field": "vto", "headerName": "Vencimiento", "editable": True, "width": 115,
      "cellClassRules": {"text-red-700 font-bold": "data.vencida"}},
-    {"field": "tarea", "headerName": "N° de tarea", "editable": True, "width": 130},
-    {"field": "servicio", "headerName": "Servicio", "editable": True, "minWidth": 200, "flex": 2},
+    {"field": "tarea", "headerName": "N° de tarea", "editable": True, "width": 110},
+    {"field": "servicio", "headerName": "Servicio", "editable": True, "minWidth": 260, "flex": 2, "tooltipField": "servicio"},
     {"field": "monto", "headerName": "Monto", "editable": True, "width": 130, "type": "rightAligned",
      ":valueFormatter": "p => p.value == null ? '' : p.value.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})"},
     {"field": "iva", "headerName": "IVA (H)", "width": 100, "type": "rightAligned"},
     {"field": "fuente", "headerName": "Leída con", "width": 120},
     {"field": "nuevo", "headerName": "Prov. nuevo", "width": 105},
-]
+])
 
 
 def aplicar_edicion(lote, args: dict) -> str | None:
@@ -511,8 +516,10 @@ def panel_revision(tabs=None, t_res=None):
                 "stopEditingWhenCellsLoseFocus": True, "singleClickEdit": False,
                 "rowClassRules": {"fila-amarilla": "data.resaltar", "fila-roja": "data.bloquea",
                                   "fila-violeta": "data.claude", "fila-excluida": "!data.incluir"},
-                "defaultColDef": {"resizable": True, "sortable": True},
-                "autoSizeStrategy": {"type": "fitGridWidth"},
+                # fixed widths that never shrink (fitting everything to the width made the headers unreadable);
+                # Proveedor and Servicio take the free space, and a narrow window scrolls sideways
+                "defaultColDef": {"resizable": True, "sortable": True, "wrapHeaderText": True, "autoHeaderHeight": True},
+                "tooltipShowDelay": 300,
             }, theme="balham").classes("w-full").style(f"height: {min(620, 64 + 28 * len(filas))}px")
 
             def editado(e):
@@ -544,11 +551,12 @@ def panel_revision(tabs=None, t_res=None):
                         ui.label(f"• {p}").classes("text-sm")
         if lote.proveedores:
             with seccion(f"Proveedores nuevos para la hoja Proveedores ({len(lote.proveedores)})", "person_add"):
-                ui.aggrid({"columnDefs": [{"field": c, "headerName": h, "width": w} for c, h, w in
-                                          [("area", "Área", 90), ("nombre", "Proveedor", 220), ("cuit", "CUIT", 120),
-                                           ("banco", "Banco", 150), ("cbu", "CBU / CVU", 200), ("alias", "Alias", 150),
-                                           ("obs", "Observaciones", 400)]],
-                           "autoSizeStrategy": {"type": "fitGridWidth"},
+                ui.aggrid({"columnDefs": _columnas([{"field": c, "headerName": h, "width": w, "tooltipField": c}
+                                                    for c, h, w in
+                                                    [("area", "Área", 90), ("nombre", "Proveedor", 220), ("cuit", "CUIT", 120),
+                                                     ("banco", "Banco", 150), ("cbu", "CBU / CVU", 200), ("alias", "Alias", 150),
+                                                     ("obs", "Observaciones", 400)]]),
+                           "defaultColDef": {"resizable": True, "wrapHeaderText": True, "autoHeaderHeight": True},
                            "rowData": [{"area": v[0], "nombre": v[1], "cuit": v[2], "banco": v[8], "cbu": v[11],
                                         "alias": v[12], "obs": v[14]} for v in (p["valores"] for p in lote.proveedores)]},
                           theme="balham").classes("w-full").style(f"height: {64 + 28 * len(lote.proveedores)}px")

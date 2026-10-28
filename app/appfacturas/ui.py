@@ -17,26 +17,64 @@ from .model import Estado, Nivel
 from .util import ahora_id, fmt_fecha, fmt_monto, parse_fecha, parse_monto
 
 CSS = """
+:root { --navy: #14147a; --naranja: #ff542c; --linea: #e3e6f0; }
+body { background: linear-gradient(180deg, #e9ebf7 0px, #f6f7fc 320px) fixed; color: #1d2030;
+       font-family: "Segoe UI", Inter, system-ui, sans-serif; }
+.ez-header { background: linear-gradient(90deg, #0d0d52, #14147a 55%, #26259c) !important;
+             border-bottom: 3px solid var(--naranja); box-shadow: 0 4px 18px rgba(20,20,122,.25); }
+.ez-logo { background: #fff; border-radius: 50%; padding: 3px; }
+.seccion { background: #fff; border: 1px solid var(--linea); border-radius: 18px; position: relative; overflow: hidden;
+           box-shadow: 0 8px 28px rgba(20,20,122,.07) !important; }
+.seccion::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+                   background: linear-gradient(90deg, var(--navy), var(--naranja)); }
+.chip-icono { width: 38px; height: 38px; border-radius: 12px; background: rgba(255,84,44,.12); color: var(--naranja);
+              display: flex; align-items: center; justify-content: center; }
+.titulo-seccion { font-size: 1.12rem; font-weight: 700; color: var(--navy); }
+.tarjeta { min-width: 160px; border-radius: 14px; background: linear-gradient(180deg, #fff, #f5f6fc);
+           border: 1px solid var(--linea); box-shadow: none !important; padding: 12px 18px; }
+.tarjeta .titulo { font-size: .75rem; color: #6b7088; text-transform: uppercase; letter-spacing: .4px; }
+.tarjeta .valor { color: var(--navy); font-size: 1.3rem; font-weight: 800; }
+.q-btn { border-radius: 10px; text-transform: none; font-weight: 600; letter-spacing: .2px; }
+.q-tab { text-transform: none; font-weight: 600; color: #4a4f6a; }
+.q-tab__label { font-size: .95rem; }
+.q-tab--active { color: var(--navy); }
+.q-tabs .q-tab__indicator { background: var(--naranja); height: 3px; border-radius: 3px; }
+.pill { border-radius: 999px; padding: 4px 14px; font-size: .8rem; font-weight: 700; }
+.pill-prueba { background: #dcfce7; color: #166534; }
+.pill-real { background: #ffe4dc; color: #b42d0e; }
+.pill-sim { background: #fef3c7; color: #92400e; }
+.q-uploader { border-radius: 14px; }
+.q-uploader__header { background: linear-gradient(90deg, var(--navy), #2b2aa8); }
+.ag-theme-balham { --ag-header-background-color: #f1f2fa; --ag-header-foreground-color: #14147a;
+                   --ag-odd-row-background-color: #fafbfe; --ag-border-radius: 10px; --ag-font-size: 13px; }
 .fila-amarilla { background-color: #fff6d5 !important; }
 .fila-roja { background-color: #fde2e1 !important; }
 .fila-violeta { background-color: #efe7fb !important; }
 .fila-excluida { color: #9aa0a6 !important; text-decoration: line-through; }
-.tarjeta { min-width: 160px; }
-.seccion { border: 2px solid #cbd5e1; border-radius: 14px; box-shadow: none; }
-.contenido { width: 100%; max-width: 1600px; margin: 0 auto; }
+.contenido { width: 100%; max-width: 1600px; margin: 0 auto; padding-bottom: 140px; }
+.alfa { position: fixed; right: 18px; bottom: 18px; z-index: 2000; width: 300px; border-radius: 18px; background: #fff;
+        border: 1px solid #f6d5c8; box-shadow: 0 12px 32px rgba(20,20,122,.18) !important; }
+.chequeo-ok { color: #15803d; } .chequeo-falta { color: #dc2626; } .chequeo-aviso { color: #d97706; }
 """
 
 
 def seccion(titulo: str, icono: str | None = None, ancho: str = "w-full"):
-    """A bordered block with its title centered: each area of the screen is one of these."""
-    c = ui.card().classes(f"seccion {ancho} items-center gap-3 p-5")
+    """A white card with a coloured top line and its title centered: each area of the screen is one of these."""
+    c = ui.card().classes(f"seccion {ancho} items-center gap-3 p-6")
     with c:
-        with ui.row().classes("w-full justify-center items-center gap-2"):
+        with ui.row().classes("w-full justify-center items-center gap-3"):
             if icono:
-                ui.icon(icono).classes("text-2xl text-slate-600")
-            ui.label(titulo).classes("text-lg font-bold text-slate-700")
-        ui.separator().classes("w-full")
+                with ui.element("div").classes("chip-icono"):
+                    ui.icon(icono).classes("text-2xl")
+            ui.label(titulo).classes("titulo-seccion")
+        ui.separator().classes("w-full opacity-60")
     return c
+
+
+def tarjeta(titulo: str, valor: str) -> None:
+    with ui.card().classes("tarjeta items-center gap-1"):
+        ui.label(titulo).classes("titulo")
+        ui.label(valor).classes("valor")
 
 
 class Estado_:
@@ -192,20 +230,27 @@ app.add_static_files("/ezfac", STATIC)
 @ui.page("/")
 def pagina():
     ui.add_css(CSS)
+    ui.colors(primary="#14147a", secondary="#ff542c", accent="#ff542c", positive="#15803d",
+              negative="#dc2626", warning="#d97706", info="#2b2aa8")
     S.cfg = cfg_activa()
-    with ui.header().classes("items-center bg-slate-800 justify-between"):
-        with ui.row().classes("items-center gap-2"):
-            ui.image("/ezfac/logo.png").classes("w-9 h-9")
-            ui.label(NOMBRE).classes("text-lg font-bold")
-            ui.label(f"v{__version__}").classes("text-xs opacity-70")
-        lbl_modo = ui.label().classes("text-sm")
-        ui.button("Salir", on_click=lambda: (ui.notify("Cerrando la app…"), _salir())).props("flat color=white")
+    with ui.header().classes("ez-header items-center justify-between px-6 py-2"):
+        with ui.row().classes("items-center gap-3"):
+            ui.image("/ezfac/logo.png").classes("ez-logo w-10 h-10")
+            with ui.column().classes("gap-0"):
+                ui.label(NOMBRE).classes("text-xl font-bold leading-tight")
+                ui.label(f"Carga de facturas de proveedores · v{__version__}").classes("text-xs opacity-75")
+        lbl_modo = ui.label().classes("pill")
+        ui.button("Salir", icon="logout", on_click=lambda: (ui.notify("Cerrando la app…"), _salir())).props("flat color=white")
 
     def refrescar_modo():
         cfg = S.cfg
-        donde = "CARPETA DE PRUEBA" if S.usar_prueba else "carpetas y planilla REALES"
-        extra = "" if puede_escribir(cfg) else " · solo simulación (escritura real no habilitada)"
-        lbl_modo.text = f"Trabajando sobre: {donde}{extra}"
+        if S.usar_prueba:
+            lbl_modo.text, tipo = "Trabajando sobre la CARPETA DE PRUEBA", "pill-prueba"
+        elif puede_escribir(cfg):
+            lbl_modo.text, tipo = "Trabajando sobre carpetas y planilla REALES", "pill-real"
+        else:
+            lbl_modo.text, tipo = "REAL · solo simulación (escritura real apagada)", "pill-sim"
+        lbl_modo.classes(replace=f"pill {tipo}")
 
     with ui.column().classes("contenido items-center gap-4 px-4"):
         with ui.tabs().props("align=center").classes("w-full") as tabs:
@@ -226,6 +271,18 @@ def pagina():
             with ui.tab_panel(t_conf).classes("items-center"):
                 panel_config(refrescar_modo)
     refrescar_modo()
+    aviso_alfa()
+
+
+def aviso_alfa() -> None:
+    with ui.card().classes("alfa p-3") as tarjeta_alfa:
+        with ui.row().classes("w-full items-center no-wrap gap-3"):
+            ui.image("/ezfac/gatito.svg").classes("w-20 h-20 shrink-0")
+            with ui.column().classes("gap-0 grow"):
+                ui.label("Esto es una alfa").classes("font-bold text-base").style("color: var(--navy)")
+                ui.label("Mandar bugs o sugerencias a Matheo").classes("text-sm text-gray-600")
+            ui.button(icon="close", on_click=lambda: tarjeta_alfa.set_visibility(False)).props(
+                "flat round dense size=sm color=grey-7").classes("self-start")
 
 
 # ------------------------------------------------------------------ Cargar
@@ -256,7 +313,7 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                                         ("Subidos acá", c.get("subidos", 0))):
                         with ui.row().classes("gap-2 items-baseline"):
                             ui.label(etiqueta).classes("text-sm text-gray-600")
-                            ui.label(str(n)).classes("text-lg font-bold")
+                            ui.label(str(n)).classes("text-xl font-bold").style("color: var(--navy)")
             contar()
 
             def vaciar_subidos():
@@ -283,7 +340,7 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                 panel_revision.refresh()
                 panel_historial.refresh()
                 tabs.set_value(t_rev)
-            ui.button("Leer facturas", icon="search", on_click=leer).props("size=lg color=primary")
+            ui.button("Leer facturas", icon="search", on_click=leer).props("size=lg color=secondary unelevated").classes("px-6")
             ui.label("Leer no mueve ni escribe nada.").classes("text-xs text-gray-500 text-center")
     ui.timer(5.0, lambda: contar.refresh())
 
@@ -315,9 +372,7 @@ def panel_revision(tabs=None, t_res=None):
                     tarjetas += [(f"Total {a}", fmt_monto(v)) for a, v in por_area.items()]
                     tarjetas += [("Avisos", f"{len(niveles[Nivel.BLOQUEA])} frenan · {len(niveles[Nivel.REVISAR])} revisar")]
                     for titulo, valor in tarjetas:
-                        with ui.card().classes("tarjeta items-center border border-slate-200 shadow-none"):
-                            ui.label(titulo).classes("text-xs text-gray-500")
-                            ui.label(valor).classes("text-lg font-bold")
+                        tarjeta(titulo, valor)
             resumen()
 
         # --- warnings
@@ -398,7 +453,7 @@ def panel_revision(tabs=None, t_res=None):
         # --- confirm
         with seccion("Confirmar", "check_circle", "w-[760px]"):
             with ui.row().classes("justify-center items-center gap-4"):
-                btn = ui.button("Confirmar y cargar", icon="check", on_click=lambda: confirmar(tabs, t_res)).props("size=lg color=positive")
+                btn = ui.button("Confirmar y cargar", icon="check", on_click=lambda: confirmar(tabs, t_res)).props("size=lg color=positive unelevated").classes("px-6")
                 if not puede_escribir(cfg):
                     btn.disable()
                     btn.tooltip("La escritura en la planilla real todavía no está habilitada (Configuración)")
@@ -478,9 +533,7 @@ def panel_resultado():
                 for titulo, valor in (("Pasos con archivos", str(len(r["hechos"]))), ("Errores", str(len(r["errores"]))),
                                       ("Filas en la planilla", str(xl.get("filas", 0))),
                                       ("Proveedores", str(xl.get("proveedores", 0)))):
-                    with ui.card().classes("tarjeta items-center border border-slate-200 shadow-none"):
-                        ui.label(titulo).classes("text-xs text-gray-500")
-                        ui.label(valor).classes("text-lg font-bold")
+                    tarjeta(titulo, valor)
             ui.label(f"Planilla: {r['excel']} {r.get('excel_mensaje', '')}").classes(
                 "text-center " + ("text-green-700" if r["excel"] == "escrito" else "text-amber-700"))
             for e in r["errores"]:
@@ -558,6 +611,12 @@ def panel_historial():
 def panel_config(refrescar_modo):
     cfg_real = config.cargar()
     with ui.column().classes("w-full items-center gap-5"):
+        with seccion("Setup", "construction", "w-[760px]"):
+            ui.label("Crea las carpetas que falten (en la app y en tu OneDrive de RUA), una planilla vacía si no "
+                     "tenés, y revisa que esté todo bien. Nunca pisa nada que ya exista.").classes("text-sm text-gray-600 text-center")
+            ui.button("Revisar y preparar todo", icon="construction", on_click=dialogo_setup).props(
+                "color=secondary unelevated size=md").classes("px-5")
+
         with seccion("Dónde trabaja la app", "folder", "w-[760px]"):
             with ui.column().classes("items-center gap-1"):
                 ui.label(f"Facturas pendientes (real): {cfg_real.base}").classes("text-sm text-center")
@@ -590,6 +649,14 @@ def panel_config(refrescar_modo):
                 panel_revision.refresh()
             ui.switch("Habilitar escritura real", value=cfg_real.modo_real, on_change=cambiar_real)
 
+        with seccion("Empezar la planilla de cero", "restart_alt", "w-[760px]"):
+            ui.label("Deja vacías las filas 12 a 210 de Vehicular y Hogar: valores, colores, comentarios y links. "
+                     "Vuelve a poner la fórmula del IVA en H, no toca la columna I ni el formato, y es el mismo "
+                     "archivo (los links compartidos siguen andando). Antes guarda dos copias de respaldo.").classes(
+                "text-sm text-gray-600 text-center")
+            ui.button("Reset de la planilla…", icon="delete_forever", on_click=dialogo_reset).props(
+                "color=negative outline")
+
         with seccion("Cómo se carga", "tune", "w-[760px]"):
             def cambiar_filas(e):
                 config.guardar_opcion(cfg_real.archivo, "reglas", "filas", e.value)
@@ -603,6 +670,108 @@ def panel_config(refrescar_modo):
                 S.cfg = cfg_activa()
             ui.switch("Escribir el servicio de la factura en la columna C", value=cfg_real.escribir_servicio,
                       on_change=cambiar_servicio)
+
+
+def mostrar_chequeo(lineas: list[str]) -> None:
+    with ui.column().classes("w-full gap-1"):
+        for l in lineas:
+            if not l.strip():
+                continue
+            for pref, icono, clase in (("OK", "check_circle", "chequeo-ok"), ("FALTA", "cancel", "chequeo-falta"),
+                                       ("AVISO", "warning", "chequeo-aviso")):
+                if l.startswith(pref):
+                    with ui.row().classes("items-start no-wrap gap-2"):
+                        ui.icon(icono).classes(f"{clase} text-lg")
+                        ui.label(l[len(pref):].strip()).classes("text-sm break-all")
+                    break
+            else:
+                ui.label(l).classes("text-sm font-bold" if l.startswith(("Todo", "Hay")) else "text-xs text-gray-500")
+
+
+async def dialogo_setup():
+    from . import instalacion, preparar
+    cfg_real = config.cargar()
+    plan = await run.io_bound(preparar.plan_setup, cfg_real)
+    ok, lineas = await run.io_bound(instalacion.chequeo)
+    with ui.dialog() as dlg, ui.card().classes("seccion w-[760px] max-w-full gap-3 p-6"):
+        ui.label("Setup").classes("titulo-seccion")
+
+        @ui.refreshable
+        def cuerpo():
+            if plan["sin_onedrive"]:
+                ui.label("No encuentro el OneDrive de RUA sincronizado en esta PC (carpeta 'OneDrive - Rua Asistencia'). "
+                         "Abrí OneDrive, iniciá sesión con tu cuenta de RUA y volvé a tocar Setup.").classes("text-red-700 text-sm")
+            pend = plan["dirs"] + plan["archivos"]
+            if pend:
+                ui.label(f"Voy a crear {len(pend)} cosas:").classes("font-bold")
+                with ui.column().classes("gap-0 w-full"):
+                    for x in pend:
+                        tipo = "archivo" if x in plan["archivos"] else "carpeta"
+                        ui.label(f"• {tipo}: {x}").classes("text-xs break-all")
+            else:
+                ui.label("No falta crear nada.").classes("font-bold chequeo-ok")
+            ui.separator()
+            ui.label("Chequeo").classes("font-bold")
+            mostrar_chequeo(lineas)
+        cuerpo()
+
+        async def crear():
+            nonlocal plan, ok, lineas
+            try:
+                hecho = await run.io_bound(preparar.ejecutar_setup, cfg_real, plan)
+            except Exception as ex:
+                ui.notify(f"No pude crear todo: {ex}", type="negative", multi_line=True)
+                return
+            ui.notify(f"Listo: {len(hecho)} cosas creadas", type="positive")
+            plan = await run.io_bound(preparar.plan_setup, config.cargar())
+            ok, lineas = await run.io_bound(instalacion.chequeo)
+            S.cfg = cfg_activa()
+            cuerpo.refresh()
+            btn.set_visibility(bool(plan["dirs"] or plan["archivos"]))
+
+        with ui.row().classes("w-full justify-center gap-3"):
+            btn = ui.button("Crear lo que falta", icon="add_circle", on_click=crear).props("color=secondary unelevated")
+            btn.set_visibility(bool(plan["dirs"] or plan["archivos"]))
+            ui.button("Cerrar", on_click=dlg.close).props("flat")
+    dlg.open()
+
+
+async def dialogo_reset():
+    from . import preparar
+    cfg = S.cfg
+    if not puede_escribir(cfg):
+        ui.notify("Para vaciar la planilla real primero habilitá la escritura real (o usá la carpeta de prueba).",
+                  type="warning", multi_line=True)
+        return
+    with ui.dialog() as dlg, ui.card().classes("seccion w-[620px] max-w-full items-center gap-3 p-6"):
+        ui.label("Reset de la planilla").classes("titulo-seccion")
+        ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {cfg.planilla}").classes(
+            "text-xs text-center break-all " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
+        ui.label("Se vacían las filas cargadas de Vehicular y Hogar. Antes se guardan dos copias: una al lado de la "
+                 "planilla y otra en datos\\backups.").classes("text-sm text-center")
+        provs = ui.checkbox("También vaciar la hoja Proveedores")
+        conf = ui.input("Escribí BORRAR para confirmar").classes("w-64")
+        with ui.row().classes("justify-center gap-3"):
+            ok_btn = ui.button("Vaciar la planilla", icon="delete_forever",
+                               on_click=lambda: dlg.submit(True)).props("color=negative unelevated")
+            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+        ok_btn.disable()
+        conf.on_value_change(lambda e: ok_btn.enable() if (e.value or "").strip().upper() == "BORRAR" else ok_btn.disable())
+    if not await dlg:
+        return
+    n = ui.notification("Vaciando la planilla…", spinner=True, timeout=None)
+    try:
+        res = await run.io_bound(preparar.reset_planilla, cfg, datos() / "backups", bool(provs.value), lambda s: None)
+    except Exception as ex:
+        ui.notify(f"No pude vaciar la planilla (no se cambió nada): {ex}", type="negative", multi_line=True)
+        return
+    finally:
+        n.dismiss()
+    total = sum(res["filas"].values())
+    ui.notify(f"Planilla vacía: {total} filas borradas" + (f" y {res['proveedores']} proveedores" if provs.value else "")
+              + f". Respaldo: {res['respaldos'][0]}", type="positive", multi_line=True, timeout=0, close_button=True)
+    S.lote = None
+    panel_revision.refresh()
 
 
 # ------------------------------------------------------------------ start

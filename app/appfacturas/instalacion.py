@@ -21,6 +21,16 @@ def _ok(b: bool) -> str:
 
 def verificar(salida: Path | None = None) -> bool:
     """Checks the PC can run the app. Returns False only for things that stop it from working."""
+    ok, r = chequeo()
+    texto = "\n".join(r)
+    print(texto)
+    if salida:
+        salida.parent.mkdir(parents=True, exist_ok=True)
+        salida.write_text(texto, encoding="utf-8")
+    return ok
+
+
+def chequeo() -> tuple[bool, list[str]]:
     r = [f"{NOMBRE} {__version__} - verificación {datetime.now():%d/%m/%Y %H:%M}", ""]
     grave = False
     r.append(f"OK    Python {sys.version.split()[0]}")
@@ -45,11 +55,11 @@ def verificar(salida: Path | None = None) -> bool:
         r.append('      o poné la ruta en config.toml > [rutas] facturas_pendientes.')
     else:
         r.append(f"OK    Facturas pendientes: {cfg.base}")
-        for sub in ("_Entrada\\Vehicular", "_Entrada\\Hogar", "Vehicular", "Hogar"):
+        for sub in ("_Entrada\\Vehicular", "_Entrada\\Hogar", "_Entrada\\_Duplicados", "_Entrada\\_Procesados", "Vehicular", "Hogar"):
             p = cfg.base.joinpath(*sub.split("\\"))
-            r.append(f"{_ok(p.is_dir())} {sub}" + ("" if p.is_dir() else "  (creala a mano en el OneDrive)"))
+            r.append(f"{_ok(p.is_dir())} {sub}" + ("" if p.is_dir() else "  (Setup la crea)"))
         r.append(f"{_ok(cfg.csv_proveedores.is_file())} _Script\\proveedores.csv"
-                 + ("" if cfg.csv_proveedores.is_file() else "  (sin esto no reconoce proveedores ya conocidos)"))
+                 + ("" if cfg.csv_proveedores.is_file() else "  (Setup lo crea vacío)"))
     if cfg.planilla and cfg.planilla.is_file():
         r.append(f"OK    Planilla: {cfg.planilla}")
         try:
@@ -62,7 +72,7 @@ def verificar(salida: Path | None = None) -> bool:
             r.append(f"AVISO no pude abrir la planilla para revisarla: {ex}")
     else:
         grave = True
-        r.append(f"FALTA planilla {cfg.planilla or 'DEUDA A PAGAR ARG.xlsx'} (en la raíz del OneDrive de RUA)")
+        r.append(f"FALTA planilla {cfg.planilla or 'DEUDA A PAGAR ARG.xlsx'} (en la raíz del OneDrive de RUA; Setup crea una vacía)")
     r.append(f"{_ok(bool(cfg.url_base))} Links de SharePoint: {cfg.url_base or 'no pude armarlos (poné url_base en config.toml)'}")
 
     if sys.platform == "win32":
@@ -78,13 +88,10 @@ def verificar(salida: Path | None = None) -> bool:
         r.append(f"{_ok(bool(nav))} Ventana propia: {nav or 'no encontré Edge ni Chrome; se abre en el navegador'}")
     r.append(f"OK    Modo real: {'HABILITADO' if cfg.modo_real else 'apagado (solo simula sobre lo real)'}")
     r.append("")
-    r.append("Todo listo." if not grave else "Hay cosas que faltan (FALTA). Resolvelas y volvé a correr el instalador.")
-    texto = "\n".join(r)
-    print(texto)
-    if salida:
-        salida.parent.mkdir(parents=True, exist_ok=True)
-        salida.write_text(texto, encoding="utf-8")
-    return not grave
+    faltan = any(l.startswith("FALTA") for l in r)
+    r.append("Hay cosas que impiden usar la app (FALTA). Tocá Setup en Configuración o resolvelas a mano." if grave
+             else "Casi listo: faltan algunas cosas (Setup las crea)." if faltan else "Todo listo.")
+    return not grave, r
 
 
 def empaquetar(destino: Path | None = None) -> Path:

@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.6.0 (27/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular y Hogar).
+Versión 0.7.0 (alfa, 27/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular y Hogar).
 
 ## Qué hace
 
@@ -84,9 +84,35 @@ Estructura de la carpeta de la app:
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
 4. **Historial:** los lotes anteriores y la opción de deshacer el último confirmado.
 5. **Configuración:**
+   - **Setup** (ver abajo): crea lo que falte y muestra el chequeo.
    - Carpeta de prueba sí o no, y rearmarla.
    - **Habilitar escritura real** (`[app] modo_real`, apagado por defecto). Mientras está apagado, lo real solo se simula.
+   - **Empezar la planilla de cero** (reset, ver abajo).
    - Una fila por ítem o una por factura; escribir el servicio en la columna C.
+- Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. Abajo a la derecha hay un aviso de versión alfa (gatito: "Esto es una alfa · mandar bugs o sugerencias a Matheo"), que se cierra con la X.
+
+## Setup (preparar.py)
+
+- Botón **Configuración → Setup → Revisar y preparar todo**.
+- Busca el OneDrive de RUA (`OneDriveCommercial` o `%USERPROFILE%\OneDrive - *`, prefiriendo el que dice Rua) y muestra **qué va a crear** antes de hacerlo. Nunca pisa nada que exista.
+  - En la app: `datos\`, `datos\lotes`, `datos\backups`, `datos\entrada_ui`.
+  - En el OneDrive: `Facturas pendientes` con `_Entrada\Vehicular`, `_Entrada\Hogar`, `_Entrada\_Duplicados`, `_Entrada\_Procesados`, `Vehicular`, `Hogar`, `_Script` y `_Script\proveedores.csv` (solo el encabezado `CUIT;Area;Proveedor;Carpeta`).
+  - Si no hay planilla, crea una **vacía** con la misma estructura: hojas Vehicular y Hogar (B4 alícuota, B5 `=TODAY()`, resumen H4:I9, encabezados en la fila 11, filas 12–210 con las fórmulas de H e I, formato de fechas y montos, colores de vencido / vence pronto, lista desplegable de Empresa desde la hoja Listas), Proveedores (encabezados A–O en la fila 4) y Listas.
+- Después muestra el **chequeo** (lo mismo que `appfacturas verificar`): librerías, carpetas, `proveedores.csv`, planilla y hojas, link de SharePoint, Excel y Edge, con OK / FALTA.
+- Si no encuentra el OneDrive de RUA sincronizado, no crea nada en la nube y lo avisa.
+
+## Reset de la planilla (preparar.reset_planilla)
+
+- Botón **Configuración → Empezar la planilla de cero → Reset de la planilla…**. Para confirmar hay que escribir BORRAR.
+- Trabaja sobre la planilla activa: la copia de prueba, o la real solo si está habilitada la escritura real.
+- No crea un archivo nuevo: vacía **el mismo** archivo, así los links compartidos de OneDrive siguen andando.
+  - Vehicular y Hogar, filas 12–210: borra valores de A–G y J, links, comentarios y rellenos.
+  - Vuelve a poner la fórmula de H, tomada de una fila que la conserve (o `=IF(G="","",ROUND(G*$B$4,2))`).
+  - La columna I no se toca. El encabezado, el resumen, el formato y las listas quedan.
+  - Opcional: vaciar también Proveedores A5:O300.
+- Antes guarda dos respaldos: `DEUDA A PAGAR ARG - respaldo antes del reset <fecha>.xlsx` al lado de la planilla, y otra copia en `datos\backups`.
+- Si la planilla está abierta con cambios sin guardar, no hace nada.
+- Después de un reset, deshacer un lote anterior ya no borra filas de la planilla (no las encuentra), pero sí devuelve los archivos.
 
 ## Reglas de negocio
 
@@ -136,15 +162,17 @@ Estructura de la carpeta de la app:
 
 ## Comandos (python -m appfacturas …)
 
-`ui` (por defecto) · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `verificar` · `empaquetar` · `prueba-mover` · `prueba-excel` · `paridad preparar|comparar`
+`ui` (por defecto) · `verificar` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `verificar` · `empaquetar` · `prueba-mover` · `prueba-excel` · `paridad preparar|comparar`
 
 ## Pruebas
 
-- En este repo: `app\tests` trae las pruebas que no necesitan facturas reales (montos, CUIT/CBU, links, empaquetado).
-- En la PC de desarrollo hay además 48 pruebas con facturas reales como fixtures (`app\tests\fixtures\`, fuera del repo por tener CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
+- En este repo: `app\tests` trae las pruebas que no necesitan facturas reales (montos, CUIT/CBU, links, empaquetado, Setup y reset de la planilla).
+- En la PC de desarrollo hay además 50 pruebas en total con facturas reales como fixtures (`app\tests\fixtures\`, fuera del repo por tener CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
 - También fuera del repo, en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).
 
 ## Pendiente
+
+- Probar el reset con Excel real (COM) en la PC, primero sobre la carpeta de prueba.
 
 - Pestaña Revisar: auditoría como `-Revisar` del script viejo.
 - Primera corrida real: Matheo habilita la escritura real.

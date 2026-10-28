@@ -23,6 +23,8 @@ Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
   - `DEUDA A PAGAR ARG.xlsx` en la raíz, con las hojas Vehicular, Hogar y Proveedores.
 - Python 3.15. Si no lo tenés, el instalador te lo consigue.
 
+¿Te falta alguna carpeta o la planilla? Abrí la app y tocá **Configuración → Setup → Revisar y preparar todo**: crea lo que falte (también una planilla vacía con la misma estructura) y te muestra un chequeo con OK / FALTA.
+
 ## Instalar
 
 1. En esta página: **Code → Download ZIP**.
@@ -33,7 +35,13 @@ Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
    - La primera vez tarda unos minutos.
    - Al final te muestra una lista de OK / FALTA y queda el ícono **RUA EZ-Fac** en el Escritorio.
 
+> **Versión alfa.** Mandá bugs o sugerencias a Matheo.
+
 La primera vez la app arranca con la **escritura real apagada**: sobre tus carpetas y tu planilla solo lee y simula. Para practicar, usá Configuración → *Trabajar sobre la carpeta de prueba*. Cuando estés seguro, prendé *Habilitar escritura real*.
+
+## Empezar la planilla de cero
+
+**Configuración → Reset de la planilla…** (hay que escribir BORRAR). Vacía las filas 12–210 de Vehicular y Hogar en el mismo archivo, así los links compartidos siguen andando: vuelve a poner la fórmula del IVA, no toca la columna I ni el formato, y si querés también vacía Proveedores. Antes guarda dos respaldos.
 
 ## Actualizar
 

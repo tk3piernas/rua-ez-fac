@@ -98,7 +98,32 @@ class HojaOpenpyxl:
 
     def comentar(self, r, c, texto):
         from openpyxl.comments import Comment
-        self.ws[f"{c}{r}"].comment = Comment(texto, "App Facturas") if texto else None
+        self.ws[f"{c}{r}"].comment = Comment(texto, "RUA EZ-Fac") if texto else None
+
+    def limpiar(self, rango):
+        for fila in self.ws[rango]:
+            for cell in fila:
+                cell.value = None
+                cell.hyperlink = None
+                cell.comment = None
+
+    def vaciar_rango(self, rango, sin_columna="I", formula_h_desde=None):
+        """Data rows back to empty: values, fills, comments and links; H gets its formula back; I untouched."""
+        from openpyxl.formula.translate import Translator
+        from openpyxl.styles import PatternFill
+        ref = self.ws[f"H{formula_h_desde}"].value if formula_h_desde else None
+        for fila in self.ws[rango]:
+            for cell in fila:
+                cell.fill = PatternFill()
+                cell.comment = None
+                if cell.column_letter == sin_columna:
+                    continue
+                cell.hyperlink = None
+                if cell.column_letter == "H":
+                    cell.value = (Translator(ref, origin=f"H{formula_h_desde}").translate_formula(cell.coordinate)
+                                  if ref else f'=IF(G{cell.row}="","",ROUND(G{cell.row}*$B$4,2))')
+                else:
+                    cell.value = None
 
 
 class LibroCOM:
@@ -223,6 +248,25 @@ class HojaCOM:
         if texto:
             cell.AddComment(texto)
 
+    def limpiar(self, rango):
+        rg = self.ws.Range(rango)
+        rg.Hyperlinks.Delete()
+        rg.ClearContents()
+        rg.ClearComments()
+
+    def vaciar_rango(self, rango, sin_columna="I", formula_h_desde=None):
+        """Data rows back to empty: values, fills, comments and links; H gets its formula back; I untouched."""
+        primera, ultima = (int("".join(ch for ch in x if ch.isdigit())) for x in rango.split(":"))
+        r1c1 = self.ws.Range(f"H{formula_h_desde}").FormulaR1C1 if formula_h_desde else \
+            '=IF(RC[-1]="","",ROUND(RC[-1]*R4C2,2))'
+        todo = self.ws.Range(rango)
+        todo.Interior.ColorIndex = -4142
+        todo.ClearComments()
+        self.ws.Range(f"J{primera}:J{ultima}").Hyperlinks.Delete()
+        self.ws.Range(f"A{primera}:G{ultima}").ClearContents()
+        self.ws.Range(f"J{primera}:J{ultima}").ClearContents()
+        self.ws.Range(f"H{primera}:H{ultima}").FormulaR1C1 = r1c1
+
 
 def abrir(cfg, ruta: Path | None = None):
     ruta = ruta or cfg.planilla
@@ -233,7 +277,7 @@ def abrir(cfg, ruta: Path | None = None):
     try:
         import win32com.client  # noqa: F401
     except ImportError as e:
-        raise ExcelError("falta pywin32: corré 'Instalar o actualizar.bat'") from e
+        raise ExcelError("falta pywin32: corré 'Instalar o actualizar RUA EZ-Fac.bat'") from e
     real = bool(cfg.base) and "onedrive" in str(ruta).lower()
     return LibroCOM(ruta, url_onedrive=cfg.url_base if real else "")
 

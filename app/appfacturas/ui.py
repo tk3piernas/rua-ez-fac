@@ -58,6 +58,8 @@ body { background: linear-gradient(180deg, #e9ebf7 0px, #f6f7fc 320px) fixed; co
 .q-dialog .seccion { overflow-y: auto; max-height: 88vh; }
 .dialogo-botones { position: sticky; bottom: -24px; background: #fff; padding: 10px 0 4px; z-index: 1;
                    border-top: 1px solid var(--linea); }
+/* paths: wrap at spaces (or anywhere only if one piece is too long), never 'DEU / DA' */
+.ruta { overflow-wrap: anywhere; word-break: normal; }
 .chequeo-ok { color: #15803d; } .chequeo-falta { color: #dc2626; } .chequeo-aviso { color: #d97706; }
 """
 
@@ -803,7 +805,7 @@ def panel_historial():
         if ultimo:
             e = ejecutor.estado(ultimo)
             ui.label(f"Último lote: {ultimo.name} ({ejecutor.etiqueta(ultimo)}), cargado en {texto_donde(ultimo)}").classes(
-                "text-sm text-gray-600 text-center break-all")
+                "text-sm text-gray-600 text-center ruta")
             with ui.row().classes("justify-center gap-4"):
                 if ejecutor.etiqueta(ultimo) == "quedó a medias" or e.get("archivos_pendientes") or e.get("excel") == "pendiente":
                     mientras_libre(ui.button("Terminar este lote", icon="play_arrow",
@@ -847,7 +849,7 @@ async def cerrar_tanda():
     with ui.dialog() as dlg, ui.card().classes("seccion w-[620px] max-w-full items-center gap-3 p-6"):
         ui.label(f"Cerrar la tanda {n}").classes("titulo-seccion")
         ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {cfg.planilla}").classes(
-            "text-xs text-center break-all " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
+            "text-xs text-center ruta " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
         nombre = ui.input("Nombre de la copia", value=f"DEUDA A PAGAR ARG tanda {n}").classes("w-96")
         vaciar = ui.checkbox("Además dejar la planilla vacía para la próxima tanda (reset)")
         conf = ui.input("Para vaciarla, escribí BORRAR").classes("w-64")
@@ -927,7 +929,7 @@ def panel_revisar():
         ui.label("Compara la planilla con las carpetas de los proveedores y busca cosas para mirar: links rotos, filas "
                  "repetidas o sin link, PDF que no están en ninguna fila, proveedores sin datos de pago y archivos "
                  "viejos en _Entrada. Solo lee: no cambia nada.").classes("text-sm text-gray-600 text-center")
-        ui.label(f"Sobre: {S.cfg.planilla}").classes("text-xs text-gray-500 text-center break-all")
+        ui.label(f"Sobre: {S.cfg.planilla}").classes("text-xs text-gray-500 text-center ruta")
         with ui.row().classes("justify-center gap-3"):
             mientras_libre(ui.button("Revisar ahora", icon="rule", on_click=revisar_ahora).props(
                 "color=secondary unelevated"))
@@ -946,7 +948,7 @@ def panel_revisar():
                               value=0 < n <= 10).classes("w-full rounded " + ("" if not n else "bg-amber-50")):
                 ui.label(h.explicacion).classes("text-xs text-gray-600")
                 for x in h.items[:300]:
-                    ui.label("• " + x).classes("text-sm break-all")
+                    ui.label("• " + x).classes("text-sm ruta")
                 if n > 300:
                     ui.label(f"… y {n - 300} más (están todos en 'Copiar informe')").classes("text-xs text-gray-500")
 
@@ -977,7 +979,7 @@ async def dialogo_exportar():
                  "con el nombre que elijas. La planilla sigue igual; si querés empezarla de cero, después usá "
                  "Configuración → Reset.").classes("text-sm text-center text-gray-600")
         nombre = ui.input("Nombre", value=f"DEUDA A PAGAR ARG {date.today():%d-%m-%Y}").classes("w-96")
-        ui.label(f"Se guarda en: {carpeta}").classes("text-xs text-center break-all " +
+        ui.label(f"Se guarda en: {carpeta}").classes("text-xs text-center ruta " +
                                                      ("chequeo-ok" if S.usar_prueba else "text-gray-500"))
 
         hecho = {}
@@ -1134,7 +1136,7 @@ def panel_proveedores():
                 ui.label(f"No pude leer {maestro.NOMBRE}: {ex}").classes("chequeo-falta")
                 return
             ui.label(f"{len(mem)} proveedores en {r or 'la planilla de proveedores'}"
-                     + ("" if r and r.is_file() else " (se crea con el primer guardado)")).classes("text-sm text-gray-600 break-all")
+                     + ("" if r and r.is_file() else " (se crea con el primer guardado)")).classes("text-sm text-gray-600 ruta")
             if mem:
                 filas = [{"area": m["valores"][0], "nombre": m["valores"][1], "cuit": m["valores"][2],
                           "banco": m["valores"][8], "cbu": m["valores"][11], "alias": m["valores"][12],
@@ -1250,7 +1252,7 @@ def panel_config(refrescar_modo):
             with ui.row().classes("justify-center items-center gap-3"):
                 mientras_libre(ui.button("Rearmar la carpeta de prueba", icon="restart_alt", on_click=rearmar).props("outline"))
             ui.label(f"Facturas pendientes (real): {cfg_real.base} · Configuración: {cfg_real.archivo}").classes(
-                "text-xs text-gray-500 text-center break-all")
+                "text-xs text-gray-500 text-center ruta")
 
         with seccion("Empezar la planilla de cero", "restart_alt", "w-[760px]"):
             ui.label("Deja vacías las filas 12 a 210 de las hojas de cada área: valores, colores, comentarios y links. "
@@ -1287,7 +1289,7 @@ def mostrar_chequeo(lineas: list[str]) -> None:
                 if l.startswith(pref):
                     with ui.row().classes("items-start no-wrap gap-2"):
                         ui.icon(icono).classes(f"{clase} text-lg")
-                        ui.label(l[len(pref):].strip()).classes("text-sm break-all")
+                        ui.label(l[len(pref):].strip()).classes("text-sm ruta")
                     break
             else:
                 ui.label(l).classes("text-sm font-bold" if l.startswith(("Todo", "Hay")) else "text-xs text-gray-500")
@@ -1314,7 +1316,7 @@ async def dialogo_setup():
             pend = plan["dirs"] + plan["archivos"] + plan["hojas"]
             if plan.get("planilla_nueva"):
                 with ui.card().classes("w-full bg-amber-50 gap-1"):
-                    ui.label(f"No encuentro la planilla: {plan['planilla_nueva']}").classes("font-bold text-sm break-all")
+                    ui.label(f"No encuentro la planilla: {plan['planilla_nueva']}").classes("font-bold text-sm ruta")
                     if plan.get("onedrive_sin_bajar"):
                         ui.label(f"No la creo: {plan['onedrive_sin_bajar']}. Si la planilla ya existe en la nube, "
                                  "esperá a que OneDrive termine de sincronizar y volvé a tocar Setup.").classes(
@@ -1329,7 +1331,7 @@ async def dialogo_setup():
                     for x in pend:
                         tipo = ("hoja de la planilla (copia vacía de otra área; antes guarda un respaldo)"
                                 if x in plan["hojas"] else "archivo" if x in plan["archivos"] else "carpeta")
-                        ui.label(f"• {tipo}: {x}").classes("text-xs break-all")
+                        ui.label(f"• {tipo}: {x}").classes("text-xs ruta")
             else:
                 ui.label("No falta crear nada.").classes("font-bold chequeo-ok")
             ui.separator()
@@ -1378,7 +1380,7 @@ async def volver_reset():
     from . import preparar
     with ui.dialog() as dlg, ui.card().classes("items-center"):
         ui.label("¿Vuelvo la planilla a como estaba antes del reset?").classes("font-bold")
-        ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {S.cfg.planilla}").classes("text-xs break-all")
+        ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {S.cfg.planilla}").classes("text-xs ruta")
         ui.label("Nadie la cambió desde el reset. Tiene que estar cerrada en Excel.").classes("text-sm text-center")
         with ui.row().classes("justify-center"):
             ui.button("Sí, volver", on_click=lambda: dlg.submit(True)).props("color=negative")
@@ -1404,7 +1406,7 @@ async def dialogo_reset():
     with ui.dialog() as dlg, ui.card().classes("seccion w-[620px] max-w-full items-center gap-3 p-6"):
         ui.label("Reset de la planilla").classes("titulo-seccion")
         ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {cfg.planilla}").classes(
-            "text-xs text-center break-all " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
+            "text-xs text-center ruta " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
         ui.label(f"Se vacían las filas cargadas de {', '.join(config.AREAS[:-1])} y {config.AREAS[-1]}. Antes se guardan dos copias: una en "
                  "la carpeta Respaldos, al lado de la planilla, y otra en datos\\backups. Mientras nadie toque la "
                  "planilla, se puede volver atrás desde Configuración.").classes("text-sm text-center")

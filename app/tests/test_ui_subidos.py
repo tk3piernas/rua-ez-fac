@@ -23,3 +23,10 @@ def test_columnas_de_la_grilla_no_se_achican():
             assert c["minWidth"] == c["width"]
         else:
             assert c["minWidth"] >= 190 and c.get("flex")
+
+
+def test_rutas_no_se_cortan_a_mitad_de_palabra():
+    """Paths wrapped with word-break: break-all showed 'DEU / DA A PAGAR ARG.xlsx'."""
+    from pathlib import Path
+    fuente = Path(ui.__file__).read_text(encoding="utf-8")
+    assert "break-all" not in fuente and ".ruta { overflow-wrap: anywhere; word-break: normal; }" in ui.CSS

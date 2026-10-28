@@ -25,7 +25,7 @@ Todo eso ya está en `.gitignore`. Si algo privado aparece como "untracked", agr
 - Excel por COM (pywin32), con la planilla abierta o cerrada. Nunca escribir sobre la columna I. Pisar H solo con 0 en Factura B, Factura C y no fiscal, o si el IVA real difiere de la fórmula en más de `tolerancia_iva`. CUIT, teléfono, N° de cuenta y CBU van como texto.
 - `[app] modo_real` (Configuración → Modo de trabajo → "Cargar en la planilla real") arranca apagado. No escribas en la planilla ni en las carpetas reales para probar: usá la carpeta de prueba (`prueba\`) o los tests.
 - Todo cambio de archivos o de la planilla tiene que poder deshacerse (diario + `deshacer`).
-- Claude como respaldo (modos A/B) está pendiente; si se hace: la API key va en el Administrador de credenciales de Windows (keyring) o en una variable de entorno, nunca en un archivo; no mandar CBU ni datos bancarios; revisar la documentación actual del SDK `anthropic` antes de escribir código.
+- Claude como respaldo: el modo B (Cowork, `claude_cowork.py`) ya está; el A (API) está pendiente; si se hace: la API key va en el Administrador de credenciales de Windows (keyring) o en una variable de entorno, nunca en un archivo; no mandar CBU ni datos bancarios; revisar la documentación actual del SDK `anthropic` antes de escribir código.
 
 ## Cómo probar
 
@@ -50,4 +50,4 @@ Se corren por separado porque cada carpeta tiene su `conftest.py`. Las dos tiene
 
 - Probar el reset de la planilla con Excel real, primero en la carpeta de prueba.
 - Primera corrida real (Matheo elige "Cargar en la planilla real").
-- Modos con Claude (A: API; B: hand-off a Cowork).
+- Modo A con Claude (API).

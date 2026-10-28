@@ -48,6 +48,10 @@ En **Configuración → Modo de trabajo** elegís uno de tres: *Solo simular* (l
 
 En **Historial → Tanda de pagos**, *Cerrar la tanda N…* guarda una copia de la planilla como `DEUDA A PAGAR ARG tanda N`, anota qué lotes entraron y, si querés, la deja vacía para la próxima. Se puede deshacer mientras nadie la toque.
 
+## Lo que la app no puede leer
+
+Si hay PDF que no se pudieron leer (escaneados, por ejemplo), en Revisión aparece **Pasarle a Claude lo que no pude leer**: prepara una carpeta con esos PDF y un pedido para Claude (Cowork). Le pedís a Claude que lo lea, y al volver a leer las facturas la app usa lo que respondió (en violeta, para revisar). Nunca manda los .txt ni datos bancarios.
+
 ## Revisar la planilla
 
 Pestaña **Revisar**: compara la planilla con las carpetas y te dice qué mirar (links rotos, filas repetidas o sin link, PDF que no están en ninguna fila, proveedores sin datos de pago, archivos viejos en `_Entrada`). Solo lee, no cambia nada.

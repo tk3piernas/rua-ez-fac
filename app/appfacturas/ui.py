@@ -650,6 +650,7 @@ def panel_revision(tabs=None, t_res=None):
                         ui.label(f"• {f.archivo.nombre}: {motivo}").classes("text-sm")
                     for p in lote.pendientes:
                         ui.label(f"• {p}").classes("text-sm")
+        seccion_claude(lote, cfg)
         if lote.proveedores:
             with seccion(f"Proveedores nuevos para la hoja Proveedores ({len(lote.proveedores)})", "person_add"):
                 ui.aggrid({"columnDefs": _columnas([{"field": c, "headerName": h, "width": w, "tooltipField": c}
@@ -786,6 +787,72 @@ def texto_donde(trabajo: Path) -> str:
     modo, planilla = ejecutor.donde(trabajo)
     lugar = {"prueba": "la COPIA de prueba", "real": "la planilla REAL"}.get(modo, "la planilla")
     return f"{lugar}{f' ({planilla})' if planilla else ''}"
+
+
+# ------------------------------------------------------------------ modo B: hand the unread ones to Claude (Cowork)
+
+def seccion_claude(lote, cfg):
+    from . import claude_cowork
+    cands = claude_cowork.candidatas(lote)
+    peds = claude_cowork.pedidos(cfg) if cfg.base else []
+    if not cands and not peds:
+        return
+    with seccion("Pasarle a Claude lo que no pude leer", "smart_toy"):
+        if cands:
+            ui.label(("1 PDF no se pudo leer" if len(cands) == 1 else f"{len(cands)} PDF no se pudieron leer")
+                     + ". Puedo copiarlos a una carpeta con un pedido para Claude "
+                     "(Cowork): los originales quedan en _Entrada. Nunca van los .txt, y los PDF con un CBU impreso "
+                     "quedan destildados.").classes("text-sm text-gray-600 text-center")
+            marcados = {}
+            with ui.column().classes("gap-0 w-full"):
+                for f in cands:
+                    con_cbu = claude_cowork.tiene_cbu(f)
+                    marcados[f.id] = ui.checkbox(f"{f.archivo.nombre}" + ("  (tiene un CBU impreso)" if con_cbu else ""),
+                                                 value=not con_cbu).classes("text-sm")
+
+            @de_a_uno
+            async def preparar_claude():
+                if not puede_escribir(cfg):
+                    ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+                    return
+                elegidas = [f for f in cands if marcados[f.id].value]
+                if not elegidas:
+                    ui.notify("No elegiste ningún PDF", type="info")
+                    return
+                try:
+                    d = await con_espera("Preparando el pedido para Claude…", claude_cowork.preparar, cfg, lote, elegidas)
+                except Exception as ex:
+                    ui.notify(f"No pude preparar el pedido: {ex}", type="negative", multi_line=True)
+                    return
+                ui.notify(f"Listo: {len(elegidas)} PDF en {d}. Abrí Claude (Cowork) en esa carpeta y pedile: "
+                          "'Leé pedido.md y hacé lo que dice'. Cuando termine, tocá Leer facturas de nuevo.",
+                          type="positive", multi_line=True, timeout=0, close_button=True)
+                panel_revision.refresh()
+            mientras_libre(ui.button("Preparar el pedido para Claude", icon="smart_toy", on_click=preparar_claude).props(
+                "color=secondary unelevated"), puede_escribir(cfg), SOLO_SIMULAR)
+        if peds:
+            ui.label("Pedidos a Claude").classes("font-bold text-sm mt-2")
+            for pd in peds[:10]:
+                with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                    ui.label(f"{fecha_lote(pd['carpeta'].name)}: {pd['respondidos']} de {pd['archivos']} respondidos"
+                             ).classes("text-sm grow")
+                    if sys.platform == "win32":
+                        import os
+                        ui.button("Abrir la carpeta", icon="folder_open",
+                                  on_click=lambda d=pd["carpeta"]: os.startfile(d)).props("flat dense")
+
+                    def borrar(d=pd["carpeta"]):
+                        try:
+                            claude_cowork.borrar(d)
+                            ui.notify("Pedido borrado (los originales siguen en _Entrada)", type="positive")
+                        except Exception as ex:
+                            ui.notify(f"No pude borrarlo: {ex}", type="warning")
+                        panel_revision.refresh()
+                    ui.button("Borrar", icon="delete", on_click=borrar).props("flat dense color=negative")
+            if any(pd["respondidos"] for pd in peds):
+                ui.button("Leer facturas de nuevo (con lo de Claude)", icon="refresh",
+                          on_click=lambda: S.leer_ahora.get(ui.context.client.id) and S.leer_ahora[ui.context.client.id]()
+                          ).props("outline")
 
 
 # ------------------------------------------------------------------ Resultado

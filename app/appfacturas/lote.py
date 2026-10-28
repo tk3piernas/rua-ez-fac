@@ -71,6 +71,9 @@ class Armador:
         self.tmp = (trabajo / "extraidos") if trabajo else Path(tempfile.mkdtemp(prefix="appfact_"))
         self.tmp.mkdir(parents=True, exist_ok=True)
         self.n = 0
+        # answers written by Claude (modo B) for invoices the app could not read, by SHA256
+        from . import claude_cowork
+        self.claude = claude_cowork.respuestas(cfg) if cfg.base else {}
         c = self.lote.contexto
         c["proveedores_csv"] = len(self.reg.por_cuit)
         c["guardadas"] = self.idx.total if self.idx else 0
@@ -132,6 +135,9 @@ class Armador:
             except Exception as ex:   # a broken parser must not stop the batch
                 self.lote.aviso(Nivel.REVISAR, "parser_error", f"{nombre}: error leyendo ({ex})", f.id)
         f.ext = e
+        if arch.sha256 in self.claude and not self._se_puede_cargar(e):
+            from . import claude_cowork
+            e = f.ext = claude_cowork.extraccion(self.claude[arch.sha256], self.cfg)
         if e and e.cuit == self.cfg.cuit_rua:
             e.cuit = ""
         fiscal_ok = bool(e and cuit_valido(e.cuit) and e.pv is not None and e.nro is not None)
@@ -161,6 +167,13 @@ class Armador:
         self._validar(f, e)
         f.estado = Estado.REVISAR if any(a.ref == f.id and a.nivel != Nivel.INFO for a in self.lote.avisos) else Estado.LISTA
         return f
+
+    def _se_puede_cargar(self, e) -> bool:
+        """The same test as below: a fiscal invoice with CUIT and number, or a non-fiscal one with its own number."""
+        if not e:
+            return False
+        fiscal = cuit_valido(e.cuit) and e.cuit != self.cfg.cuit_rua and e.pv is not None and e.nro is not None
+        return bool(fiscal or ((e.razon_social or e.cbu) and e.numero_txt and e.total is not None))
 
     def _identificar(self, f: Factura, e, nombre: str, fiscal_ok: bool):
         """Provider (registered or proposed as new), area, duplicate key and file / link names."""
@@ -332,7 +345,7 @@ class Armador:
             av(Nivel.INFO, "tareas_archivo", f"el nombre del archivo menciona {', '.join(e.tareas_archivo)}; "
                "no las cargo en B (completalas en la revisión si corresponden)")
         for nota in e.notas:
-            av(Nivel.REVISAR if re.search(r"no fiscal|vencimiento|no coincide|varios CUIT", nota) else Nivel.INFO, "nota", nota)
+            av(Nivel.REVISAR if re.search(r"no fiscal|vencimiento|no coincide|varios CUIT|Claude", nota) else Nivel.INFO, "nota", nota)
 
     # ------------------------------------------------------------ duplicates vs the sheet (PS1 Revisar-Factura)
     def _duplicados_planilla(self) -> None:

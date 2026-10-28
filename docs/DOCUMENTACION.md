@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.13.2 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.14.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -89,6 +89,7 @@ Estructura de la carpeta de la app:
      - Editar **Proveedor** de un proveedor nuevo lo cambia en todo: carpeta, línea de `proveedores.csv`, links y filas de todas sus facturas del lote. Uno ya registrado no se cambia acá (avisa que se corrige en `proveedores.csv`).
      - Editar **Monto**: en Factura B, C o no fiscal H sigue en 0; en Factura A, H vuelve a la fórmula (el IVA leído era del monto anterior) y lo avisa.
    - Secciones de lo que no se carga, los proveedores nuevos y los archivos que se mueven.
+   - **Pasarle a Claude lo que no pude leer** (modo B, Cowork): si hay PDF no leídos (escaneados o con un formato desconocido), *Preparar el pedido para Claude* copia los elegidos a `Facturas pendientes\_Revisar con Claude\<lote>\` con `pedido.md` (instrucciones y formato) y `pedido.json` (archivos y SHA256). Los originales quedan en `_Entrada`. Nunca van los .txt; un PDF con un CBU impreso queda destildado, y el pedido le pide a Claude no copiar datos bancarios ni personales. En Cowork se abre esa carpeta y se le pide "Leé pedido.md y hacé lo que dice"; Claude escribe `respuesta.json`. Al leer de nuevo, cada PDF no leído con respuesta (se busca por SHA256) se toma de ahí: fuente "claude", fila violeta y aviso REVISAR; sigue el camino normal (duplicados, grilla, confirmar, deshacer). Una respuesta con `no_pude` se ignora. La lista "Pedidos a Claude" muestra cuántos se respondieron, con Abrir la carpeta y Borrar (solo tiene copias). En Solo simular el botón está deshabilitado.
    - Botones Confirmar y Copiar al portapapeles. Si no hay avisos para revisar ni que frenen y nada excluido, Confirmar carga directo (sin el "¿Confirmo?"); si hay, pregunta.
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
 4. **Historial:**
@@ -241,4 +242,4 @@ Herramientas aparte (fuera del paquete, en `app\herramientas\`): `prueba.py move
 - Probar el reset con Excel real (COM) en la PC, primero sobre la carpeta de prueba.
 
 - Primera corrida real: Matheo elige "Cargar en la planilla real".
-- Modos con Claude: A (API, clave en el Administrador de credenciales de Windows) y B (Cowork, `_Revisar con Claude\<lote>\`).
+- Modo A con Claude (API, clave en el Administrador de credenciales de Windows). El modo B (Cowork) ya está.

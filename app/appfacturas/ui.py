@@ -954,7 +954,7 @@ def seccion_claude(lote, cfg):
                     def borrar(d=pd["carpeta"]):
                         try:
                             claude_cowork.borrar(d)
-                            ui.notify("Pedido borrado (los originales siguen en _Entrada)", type="positive")
+                            ui.notify("Pedido a la papelera (los originales siguen en _Entrada)", type="positive")
                         except Exception as ex:
                             ui.notify(f"No pude borrarlo: {ex}", type="warning")
                         panel_revision.refresh()

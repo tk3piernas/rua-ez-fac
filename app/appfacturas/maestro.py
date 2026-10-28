@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from .util import norm, sha256, solo_digitos
+from .util import guardar_json, norm, sha256, solo_digitos
 
 NOMBRE = "PROVEEDORES RUA.xlsx"
 HOJA = "Proveedores"
@@ -185,7 +185,7 @@ def guardar(cfg, fichas: list[tuple[list, bool]], historial: Path, motivo: str, 
                      "motivo": motivo, "ruta": str(r), "creado": creado, "sha256": sha256(r), "cambios": cambios,
                      "deshecho": False})
         historial.parent.mkdir(parents=True, exist_ok=True)
-        historial.write_text(json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
+        guardar_json(historial, hist)
     return cambios
 
 
@@ -248,5 +248,5 @@ def deshacer(cfg, historial: Path, todo: bool = False, log=print, id_: str = "")
                 log(f"BORRO  {r.name} (la había creado la app y quedó vacía)")
         e["deshecho"] = True
         # saved after each change: if a later one fails, the ones already undone are not tried again
-        historial.write_text(json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
+        guardar_json(historial, hist)
     return problemas

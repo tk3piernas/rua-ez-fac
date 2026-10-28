@@ -196,7 +196,11 @@ def extraccion(x: dict, cfg) -> Extraccion:
 
 
 def borrar(carpeta: Path) -> None:
-    """Removes a request folder: only the app's copies, pedido.*, and respuesta.json are in it."""
-    if carpeta.parent.name != CARPETA:
+    """Sends a request folder (the app's copies, pedido.*, respuesta.json) to the recycle bin. It lives in the
+    OneDrive, so it is never deleted for good: anything someone else put there can still be recovered."""
+    from .borrado import MAX_PAPELERA, _a_la_papelera
+    if carpeta.parent.name != CARPETA or carpeta.is_symlink() or not carpeta.is_dir():
         raise ValueError(f"{carpeta} no es una carpeta de pedidos a Claude")
-    shutil.rmtree(carpeta)
+    if any(len(str(f)) >= MAX_PAPELERA for f in [carpeta, *carpeta.rglob("*")]):
+        raise ValueError("tiene rutas demasiado largas para la papelera de Windows; borrala a mano")
+    _a_la_papelera(carpeta)

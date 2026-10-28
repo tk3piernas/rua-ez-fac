@@ -1,2 +1,2 @@
-﻿__version__ = "0.19.3"
+﻿__version__ = "0.19.4"
 NOMBRE = "RUA EZ-Fac"

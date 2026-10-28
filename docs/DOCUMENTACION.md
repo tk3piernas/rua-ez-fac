@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.18.2 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.19.4 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -98,7 +98,7 @@ Estructura de la carpeta de la app:
      - Editar **Proveedor** de un proveedor nuevo lo cambia en todo: carpeta, línea de `proveedores.csv`, links y filas de todas sus facturas del lote. Uno ya registrado no se cambia acá (avisa que se corrige en `proveedores.csv`).
      - Editar **Monto**: en Factura B, C o no fiscal H sigue en 0; en Factura A, H vuelve a la fórmula (el IVA leído era del monto anterior) y lo avisa.
    - Secciones de lo que no se carga, los proveedores nuevos y los archivos que se mueven.
-   - **Pasarle a Claude lo que no pude leer** (modo B, Cowork): si hay PDF no leídos (escaneados o con un formato desconocido), *Preparar el pedido para Claude* copia los elegidos a `Facturas pendientes\_Revisar con Claude\<lote>\` con `pedido.md` (instrucciones y formato) y `pedido.json` (archivos y SHA256). Los originales quedan en `_Entrada`. Nunca van los .txt; un PDF con un CBU impreso queda destildado, y el pedido le pide a Claude no copiar datos bancarios ni personales. En Cowork se abre esa carpeta y se le pide "Leé pedido.md y hacé lo que dice"; Claude escribe `respuesta.json`. Al leer de nuevo, cada PDF no leído con respuesta (se busca por SHA256) se toma de ahí: fuente "claude", fila violeta y aviso REVISAR; sigue el camino normal (duplicados, grilla, confirmar, deshacer). Una respuesta con `no_pude` se ignora. Si Claude la leyó pero no se puede cargar (por ejemplo un CUIT con el dígito verificador mal, como el de la factura de ejemplo de ARCA), queda en `_Entrada` con un aviso que dice por qué, y no se vuelve a ofrecer para mandar. La lista "Pedidos a Claude" muestra cuántos se respondieron, con Abrir la carpeta y Borrar (solo tiene copias). En Solo simular el botón está deshabilitado.
+   - **Pasarle a Claude lo que no pude leer** (modo B, Cowork): si hay PDF no leídos (escaneados o con un formato desconocido), *Preparar el pedido para Claude* copia los elegidos a `Facturas pendientes\_Revisar con Claude\<lote>\` con `pedido.md` (instrucciones y formato) y `pedido.json` (archivos y SHA256). Los originales quedan en `_Entrada`. Nunca van los .txt; un PDF con un CBU impreso queda destildado, y el pedido le pide a Claude no copiar datos bancarios ni personales. En Cowork se abre esa carpeta y se le pide "Leé pedido.md y hacé lo que dice"; Claude escribe `respuesta.json`. Al leer de nuevo, cada PDF no leído con respuesta (se busca por SHA256) se toma de ahí: fuente "claude", fila violeta y aviso REVISAR; sigue el camino normal (duplicados, grilla, confirmar, deshacer). Una respuesta con `no_pude` se ignora. Si Claude la leyó pero no se puede cargar (por ejemplo un CUIT con el dígito verificador mal, como el de la factura de ejemplo de ARCA), queda en `_Entrada` con un aviso que dice por qué, y no se vuelve a ofrecer para mandar. La lista "Pedidos a Claude" muestra cuántos se respondieron, con Abrir la carpeta y Borrar (solo tiene copias; va a la papelera, porque está en el OneDrive). En Solo simular el botón está deshabilitado.
    - **Leer ahora con la API de Claude** (modo A, `claude_api.py`): con una clave guardada (Configuración → *Claude para lo que no se puede leer*), manda los PDF no leídos elegidos a la API (modelo `claude-opus-5-5`, effort `medium`, respuesta en JSON con esquema fijo, `fallbacks: "default"` por si una política la rechaza) y pide confirmación antes, porque cada factura cuesta unos centavos de dólar. La respuesta se guarda como un pedido más (`_Revisar con Claude\<lote> API\` con `pedido.json` y `respuesta.json`) y el lote se vuelve a leer solo: las facturas leídas quedan violeta con aviso REVISAR, igual que en el modo B. Un error de una factura (conexión, límite, rechazo) no frena las demás y se muestra. El esquema no tiene campos para datos bancarios, nunca van los .txt y los PDF con CBU impreso quedan destildados.
    - **Clave de la API:** se guarda en el Administrador de credenciales de Windows (`keyring`, servicio "RUA EZ-Fac"), nunca en un archivo; también sirve la variable de entorno `ANTHROPIC_API_KEY`. Se puede borrar desde Configuración.
    - Botones Confirmar y Copiar al portapapeles. Si no hay avisos para revisar ni que frenen y nada excluido, Confirmar carga directo (sin el "¿Confirmo?"); si hay, pregunta.
@@ -260,6 +260,8 @@ Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <
 ## Lotes cortados a medias y archivos que no se movieron
 
 - `lote_confirmado.json` se escribe **antes** de mover nada (el plan ya es final), y otra vez al terminar.
+- El diario, los estados de los lotes, las tandas, el historial de la memoria de proveedores y el registro del reset se guardan con `util.guardar_json`. Escribe un archivo temporal, lo baja al disco y recién después lo cambia por el anterior, así que un corte (app cerrada, PC apagada) nunca deja un registro a medio escribir.
+- Cada movimiento de un PDF se anota en el diario **antes** de hacerlo (`moviendo`) y otra vez después (`mover`). Si la app se cortó entre las dos anotaciones y el archivo está en destino con el mismo SHA256, Terminar este lote y Deshacer lo dan por movido (`Diario.completar_cortados`): Deshacer lo devuelve, y Terminar no lo busca en `_Entrada`.
 - Si un archivo no se pudo mover (por ejemplo OneDrive lo tenía tomado), las filas de esa factura **no** se escriben, para que nunca haya un link a un archivo que sigue en `_Entrada`. En Resultado aparece cuántas quedaron y el botón **Reintentar archivos**.
 - **Terminar este lote / Reintentar** (`ejecutor.continuar`): hace solo los pasos de archivos que no están en el diario y después escribe solo las filas que todavía no se guardaron en la planilla. Se puede repetir sin duplicar nada. Sirve también para un lote que quedó a medias.
 - `estado.json` guarda `modo` (prueba / real), `base` y `planilla`. Para los lotes viejos, Historial lo deduce de la ruta de la planilla en el diario.
@@ -275,7 +277,9 @@ Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <
 
 ## Comandos (python -m appfacturas …)
 
-`ui` (por defecto) · `verificar` · `revisar` · `accesos` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `empaquetar`
+`ui` (por defecto) · `verificar` · `revisar` · `accesos` · `simular [--entrada]` · `portapapeles` · `empaquetar`
+
+Ninguno mueve archivos ni escribe en la planilla. `procesar`, `deshacer` y `excel-pendiente` se sacaron en la 0.19.4: no miraban el modo de trabajo y podían tocar lo real en "Solo simular". Todo eso se hace desde la app.
 
 Herramientas aparte (fuera del paquete, en `app\herramientas\`): `prueba.py mover|excel` (pruebas automáticas sobre la carpeta de prueba) y `paridad.py preparar|comparar` (la comparación contra el script viejo, ya retirado; necesita el PS1, que no está en el repo).
 

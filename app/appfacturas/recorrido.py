@@ -93,9 +93,9 @@ def visto(datos: Path) -> bool:
 
 def marcar_visto(datos: Path, terminado: bool) -> None:
     datos.mkdir(parents=True, exist_ok=True)
-    _archivo(datos).write_text(json.dumps({"visto": True, "terminado": terminado,
-                                           "fecha": datetime.now().isoformat(timespec="seconds")}),
-                               encoding="utf-8")
+    from .util import guardar_json
+    guardar_json(_archivo(datos), {"visto": True, "terminado": terminado,
+                                   "fecha": datetime.now().isoformat(timespec="seconds")})
 
 
 def js() -> str:

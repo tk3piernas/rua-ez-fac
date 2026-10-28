@@ -325,12 +325,11 @@ def _archivo_reset(backups: Path) -> Path:
 
 
 def _anotar_reset(planilla: Path, backups: Path, copias: list[Path]) -> None:
-    import json
-    from .util import sha256
-    _archivo_reset(backups).write_text(json.dumps(
-        {"fecha": datetime.now().isoformat(timespec="seconds"), "planilla": str(planilla),
-         "respaldo": str(copias[0]), "respaldo_local": str(copias[1]),
-         "sha256": sha256(planilla), "deshecho": False}, ensure_ascii=False, indent=1), encoding="utf-8")
+    from .util import guardar_json, sha256
+    guardar_json(_archivo_reset(backups),
+                 {"fecha": datetime.now().isoformat(timespec="seconds"), "planilla": str(planilla),
+                  "respaldo": str(copias[0]), "respaldo_local": str(copias[1]),
+                  "sha256": sha256(planilla), "deshecho": False})
 
 
 def reset_para_volver(cfg, backups: Path) -> dict | None:
@@ -354,7 +353,7 @@ def reset_para_volver(cfg, backups: Path) -> dict | None:
 def volver_del_reset(cfg, backups: Path, log=print) -> Path:
     """Puts back the workbook as it was before the last reset. Same file (written in place, so the OneDrive
     sharing links keep working). Only if nobody changed it since the reset, and with the workbook closed."""
-    import json
+    from .util import guardar_json
     r = reset_para_volver(cfg, backups)
     if not r:
         raise ExcelError("no hay un reset para deshacer (o la planilla cambió después del reset)")
@@ -364,7 +363,7 @@ def volver_del_reset(cfg, backups: Path, log=print) -> Path:
     shutil.copyfile(r["copia"], pl)
     r["deshecho"] = True
     r.pop("copia")
-    _archivo_reset(backups).write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
+    guardar_json(_archivo_reset(backups), r)
     log(f"PLANILLA vuelve a como estaba antes del reset del {r['fecha']}")
     return pl
 

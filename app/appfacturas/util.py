@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import re
 import unicodedata
 from datetime import date, datetime
@@ -159,6 +161,19 @@ def ruta_libre(p: Path, ocupadas: set[str] | None = None) -> Path:
 def url_sharepoint(base: str, *partes: str) -> str:
     """Same as the PS1: base with spaces as %20 + each part with EscapeDataString."""
     return base.replace(" ", "%20").rstrip("/") + "/" + "/".join(quote(p, safe="") for p in partes)
+
+
+def guardar_json(ruta: Path, datos, default=None) -> None:
+    """Writes a record so that a cut (app closed, PC off) never leaves it half written: a temporary file,
+    flushed to disk, then swapped in. The journal and the states depend on it to undo."""
+    ruta = Path(ruta)
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ruta.with_name(ruta.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=1, default=default)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, ruta)
 
 
 def sha256(p: Path) -> str:

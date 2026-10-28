@@ -25,12 +25,12 @@ from . import config, preparar
 from .carpeta_prueba import carpeta_prueba
 from .excel import ExcelError, abrir
 from .maestro import NOMBRE as NOMBRE_MAESTRO
-from .util import sha256
+from .util import guardar_json, sha256
 
 FACTURAS = "Facturas pendientes"
 PREFIJO = "_Borrado "
 ACTIVOS = ("en curso", "hecho", "deshecho a medias")        # a record in these states blocks a new 'Borrar todo'
-QUEDAN_EN_DATOS = ("recorrido.json", "borrado.json", "borrado.tmp")   # + app.log* (open while the app runs)
+QUEDAN_EN_DATOS = ("recorrido.json", "borrado.json", "borrado.json.tmp")   # + app.log* (open while the app runs)
 SOLO_NUBE = 0x00400000 | 0x00040000 | 0x00001000           # RECALL_ON_DATA_ACCESS, RECALL_ON_OPEN, OFFLINE
 MAX_PAPELERA = 260                                          # MAX_PATH: longer paths do not fit in the recycle bin
 
@@ -303,14 +303,7 @@ def estado(modo: str) -> dict | None:
 
 def _guardar(modo: str, reg: dict) -> None:
     """Atomic and flushed to disk: the record must survive a cut right after it."""
-    r = _registro(modo)
-    r.parent.mkdir(parents=True, exist_ok=True)
-    tmp = r.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(reg, f, ensure_ascii=False, indent=1)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, r)
+    guardar_json(_registro(modo), reg)
 
 
 def _mover(src: Path, dst: Path) -> None:

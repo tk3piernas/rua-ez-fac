@@ -22,7 +22,8 @@ def leer(datos: Path) -> list[dict]:
 
 def _guardar(datos: Path, tandas: list[dict]) -> None:
     datos.mkdir(parents=True, exist_ok=True)
-    (datos / ARCHIVO).write_text(json.dumps(tandas, ensure_ascii=False, indent=1), encoding="utf-8")
+    from .util import guardar_json
+    guardar_json(datos / ARCHIVO, tandas)
 
 
 def _de_la_planilla(tandas: list[dict], planilla) -> list[dict]:

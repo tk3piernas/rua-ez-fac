@@ -18,7 +18,7 @@ from .model import Lote
 HIST_MEMORIA = "memoria_proveedores.json"
 
 
-from .util import relativa, ruta_libre, sha256, url_sharepoint
+from .util import guardar_json, relativa, ruta_libre, sha256, url_sharepoint
 
 
 class YaDeshecho(Exception):
@@ -58,8 +58,22 @@ class Diario:
     def anotar(self, paso: dict) -> None:
         paso["hora"] = datetime.now().isoformat(timespec="seconds")
         self.pasos.append(paso)
-        self.carpeta.mkdir(parents=True, exist_ok=True)
-        self.ruta.write_text(json.dumps(self.pasos, ensure_ascii=False, indent=1), encoding="utf-8")
+        guardar_json(self.ruta, self.pasos)
+
+    def completar_cortados(self) -> int:
+        """A move or copy announced ('moviendo') but not confirmed: the app closed in between. If the file is at
+        its destination with the same SHA256 (and, for a move, gone from where it was), it is journaled as done,
+        so undo brings it back and continuing does not look for it in _Entrada. Returns how many."""
+        hechos = {(x["op"], x.get("de"), x.get("a")) for x in self.pasos if x["op"] in ("mover", "copiar")}
+        n = 0
+        for x in list(self.pasos):
+            if x["op"] != "moviendo" or (x["como"], x["de"], x["a"]) in hechos:
+                continue
+            de, a = Path(x["de"]), Path(x["a"])
+            if a.is_file() and sha256(a) == x["sha256"] and (x["como"] == "copiar" or not de.exists()):
+                self.anotar({"op": x["como"], "de": x["de"], "a": x["a"], "sha256": x["sha256"], "recuperado": True})
+                n += 1
+        return n
 
 
 def estado(carpeta: Path) -> dict:
@@ -70,7 +84,7 @@ def estado(carpeta: Path) -> dict:
 def _guardar_estado(carpeta: Path, **kw) -> None:
     d = estado(carpeta)
     d.update(kw)
-    (carpeta / "estado.json").write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    guardar_json(carpeta / "estado.json", d)
 
 
 def _mover(de: Path, a: Path, intentos: int = 4) -> None:
@@ -127,11 +141,11 @@ class Ejecutor:
         return self._terminar()
 
     def _guardar_lote(self) -> None:
-        (self.carpeta / "lote_confirmado.json").write_text(
-            json.dumps(self.lote, default=_a_json, ensure_ascii=False, indent=1), encoding="utf-8")
+        guardar_json(self.carpeta / "lote_confirmado.json", self.lote, default=_a_json)
 
     def _pasos(self) -> None:
         """File steps of the plan that the journal does not have yet (all of them the first time)."""
+        self.diario.completar_cortados()
         pasos = sorted((p for p in self.lote.plan if p["op"] in ORDEN and not _hecho(p, self.diario.pasos)),
                        key=lambda p: ORDEN[p["op"]])
         for p in pasos:
@@ -230,6 +244,7 @@ class Ejecutor:
         de = Path(p["de"])
         h = sha256(de)
         a = self._destino_libre(p)
+        self.diario.anotar({"op": "moviendo", "como": "mover", "de": str(de), "a": str(a), "sha256": h})
         _mover(de, a)
         self.diario.anotar({"op": "mover", "de": str(de), "a": str(a), "sha256": h})
         self.hechos.append(f"{de.name} -> {self._rel(a)}")
@@ -237,7 +252,9 @@ class Ejecutor:
 
     def _copiar(self, p: dict) -> None:
         de = Path(p["de"])
+        h = sha256(de)
         a = self._destino_libre(p)
+        self.diario.anotar({"op": "moviendo", "como": "copiar", "de": str(de), "a": str(a), "sha256": h})
         shutil.copy2(de, a)
         self.diario.anotar({"op": "copiar", "de": str(de), "a": str(a), "sha256": sha256(a)})
         self.hechos.append(f"{de.name} (del zip) -> {self._rel(a)}")
@@ -247,6 +264,7 @@ class Ejecutor:
         h = sha256(de)
         a = ruta_libre(a)
         self._carpeta(a.parent)
+        self.diario.anotar({"op": "moviendo", "como": op, "de": str(de), "a": str(a), "sha256": h})
         _mover(de, a)
         self.diario.anotar({"op": op, "de": str(de), "a": str(a), "sha256": h})
         self.hechos.append(f"{de.name} -> {self._rel(a)}")
@@ -399,7 +417,9 @@ def _deshacer_memoria(carpeta_lote: Path, log, cfg) -> list[str]:
 
 def _deshacer(carpeta_lote: Path, log, cfg) -> list[str]:
     from . import excel
-    pasos = Diario(carpeta_lote).pasos
+    diario = Diario(carpeta_lote)
+    diario.completar_cortados()                  # a file moved right before the app closed also goes back
+    pasos = diario.pasos
     problemas: list[str] = []
     memoria_pendiente = False
     if excel.pasos_guardados(pasos):

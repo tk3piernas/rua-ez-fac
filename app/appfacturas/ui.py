@@ -1824,6 +1824,8 @@ def abrir_ventana(url: str) -> None:
     if exe:
         try:
             subprocess.Popen([exe, f"--app={url}", "--window-size=1500,950"])
+            from . import ventana
+            ventana.marcar_cuando_aparezca()     # its own icon in the taskbar, and pinnable as RUA EZ-Fac
             return
         except OSError:
             pass

@@ -39,7 +39,7 @@ Si editás el nombre de un proveedor nuevo en la grilla, se cambia en todo (carp
 
 3. Esperá. La primera vez tarda unos minutos.
 
-Baja la última versión, la guarda en **Documentos\RUA EZ-Fac** (nunca adentro de OneDrive), le saca la marca de "bajado de internet" y corre el instalador. Si falta Python 3.15 lo instala solo, o te abre la página para bajarlo. Al final queda el ícono **RUA EZ-Fac** en el Escritorio. **Para actualizar se usa la misma línea**: conserva tu configuración y tus datos.
+Baja la última versión, la guarda en **Documentos\RUA EZ-Fac** (nunca adentro de OneDrive), le saca la marca de "bajado de internet" y corre el instalador. Si falta Python 3.15 lo instala solo, o te abre la página para bajarlo. Al final queda el ícono **RUA EZ-Fac** en el Escritorio. Para tenerla en la barra de tareas: con la app abierta, clic derecho en su ícono de la barra → **Anclar a la barra de tareas**. **Para actualizar se usa la misma línea**: conserva tu configuración y tus datos.
 
 ### Si preferís el zip
 

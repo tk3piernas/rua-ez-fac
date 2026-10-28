@@ -55,7 +55,9 @@ echo [3/5] Conectando la app ...
 "%PY%" -c "import sysconfig,pathlib;pathlib.Path(sysconfig.get_paths()['purelib'],'appfacturas.pth').write_text(r'%~dp0app')"
 
 echo [4/5] Iconos en el Escritorio y en el menu Inicio ...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s = New-Object -ComObject WScript.Shell; foreach ($c in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) { try { $v = Join-Path $c 'App Facturas.lnk'; if (Test-Path $v) { Remove-Item $v }; $l = $s.CreateShortcut((Join-Path $c 'RUA EZ-Fac.lnk')); $l.TargetPath = '%~dp0.venv\Scripts\pythonw.exe'; $l.Arguments = '-m appfacturas ui'; $l.WorkingDirectory = '%~dp0'; $l.Description = 'RUA EZ-Fac: carga de facturas de proveedores'; $l.IconLocation = '%~dp0app\appfacturas\static\ezfac.ico'; $l.Save(); Write-Host ('      ' + $c + '\RUA EZ-Fac') } catch { Write-Host ('      No pude crear el icono en ' + $c) } }"
+rem With the apps AppUserModelID, so the window groups with its icon and can be pinned to the taskbar
+"%PY%" -m appfacturas accesos
+if errorlevel 1 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s = New-Object -ComObject WScript.Shell; foreach ($c in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) { try { $v = Join-Path $c 'App Facturas.lnk'; if (Test-Path $v) { Remove-Item $v }; $l = $s.CreateShortcut((Join-Path $c 'RUA EZ-Fac.lnk')); $l.TargetPath = '%~dp0.venv\Scripts\pythonw.exe'; $l.Arguments = '-m appfacturas ui'; $l.WorkingDirectory = '%~dp0'; $l.Description = 'RUA EZ-Fac: carga de facturas de proveedores'; $l.IconLocation = '%~dp0app\appfacturas\static\ezfac.ico'; $l.Save(); Write-Host ('      ' + $c + '\RUA EZ-Fac') } catch { Write-Host ('      No pude crear el icono en ' + $c) } }"
 
 echo [5/5] Revisando que este todo ...
 if exist app\tests (

@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.16.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.17.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -61,7 +61,7 @@ Estructura de la carpeta de la app:
      - después, `requirements-nodeps.txt` con `--no-deps`. PyMuPDF 2.0 pide onnxruntime y NiceGUI pide uvicorn[standard], que trae pyyaml; ninguno de los dos tiene versión para Python 3.15 y la app no los usa.
      - Sin internet, usa la carpeta `wheels\` si existe.
   5. Escribe `appfacturas.pth` en el venv.
-  6. Crea los íconos "RUA EZ-Fac" en el Escritorio y en el menú Inicio (`pythonw -m appfacturas ui`, ícono `static\ezfac.ico`) y borra los viejos "App Facturas".
+  6. Crea los íconos "RUA EZ-Fac" en el Escritorio y en el menú Inicio (`python -m appfacturas accesos`: `pythonw -m appfacturas ui`, ícono `static\ezfac.ico`, AppUserModelID `RUA.EZFac`) y borra los viejos "App Facturas". Si eso falla, los crea como antes con PowerShell (sin la identidad).
   7. Corre las pruebas, si están, y `appfacturas verificar` (resultado en `datos\verificacion.txt`).
 - **Actualizar:** se copian los `.py` nuevos en `app\appfacturas\` y se abre la app. Si estaba abierta una versión anterior, la app la cierra sola: consulta `/api/version` y, si no coincide, hace `taskkill` del python que escucha en el puerto. Solo hace falta reinstalar cuando cambian los `requirements`.
 - **Instalar en otra PC:**
@@ -79,6 +79,7 @@ Estructura de la carpeta de la app:
   - **Abrir planilla**: abre en Excel la planilla en la que escribe la app (la real o la copia de prueba, según el modo).
   - **Exportar planilla**: guarda una copia con el nombre que elijas (por defecto `DEUDA A PAGAR ARG dd-mm-aaaa`) en la carpeta `Planillas exportadas`, al lado de la planilla. Usa `SaveCopyAs` de Excel, así que si está abierta incluye lo que tenga sin guardar; la planilla no cambia. Nunca pisa una exportada con el mismo nombre. Después de exportar se puede abrir la copia o deshacer (la borra si nadie la tocó). Para empezar de cero después, Reset.
 - Deshacer un lote que ya estaba deshecho no hace nada (antes, un segundo clic informaba como "cambió después" todo lo que ya había vuelto).
+- **Barra de tareas:** la ventana es Edge en modo app, pero apenas se abre la app le pone la identidad `RUA.EZFac` (AppUserModelID), con su ícono, su nombre y el comando para volver a abrirla (`ventana.py`). Los accesos directos llevan la misma identidad. Así la ventana se agrupa con el ícono de RUA EZ-Fac y no con Edge, y *Anclar a la barra de tareas* (clic derecho en el ícono de la barra, o en el acceso directo) deja el ícono de la app y abre la app.
 - El botón Salir, en la punta derecha del encabezado (al lado del modo de trabajo), cierra la ventana de la app (si el navegador no la deja cerrarse, muestra "RUA EZ-Fac se cerró") y apaga el servidor; lo fuerza a los 1,5 segundos si algo lo retiene.
 
 ## Pantallas
@@ -228,7 +229,7 @@ Estructura de la carpeta de la app:
 
 ## Comandos (python -m appfacturas …)
 
-`ui` (por defecto) · `verificar` · `revisar` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `empaquetar`
+`ui` (por defecto) · `verificar` · `revisar` · `accesos` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `empaquetar`
 
 Herramientas aparte (fuera del paquete, en `app\herramientas\`): `prueba.py mover|excel` (pruebas automáticas sobre la carpeta de prueba) y `paridad.py preparar|comparar` (la comparación contra el script viejo, ya retirado; necesita el PS1, que no está en el repo).
 

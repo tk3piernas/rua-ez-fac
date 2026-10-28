@@ -33,6 +33,7 @@ def main(argv=None) -> int:
     sub.add_parser("portapapeles", help="copia al portapapeles las filas del último lote (para pegarlas a mano)")
     sub.add_parser("verificar", help="revisa que la PC tenga todo lo necesario")
     sub.add_parser("revisar", help="auditoría de la planilla contra las carpetas (solo lee)")
+    sub.add_parser("accesos", help="crea los íconos del Escritorio y del menú Inicio (anclables a la barra de tareas)")
     sub.add_parser("empaquetar", help="arma un zip para instalar la app en otra PC")
     u = sub.add_parser("ui", help="abre la app en el navegador")
     u.add_argument("--sin-navegador", action="store_true")
@@ -41,6 +42,9 @@ def main(argv=None) -> int:
         from . import ui
         ui.main(abrir_navegador=not a.sin_navegador)
         return 0
+    if a.cmd == "accesos":
+        from . import ventana
+        return 0 if ventana.crear_accesos(config.carpeta_app()) else 1
     if a.cmd == "revisar":
         from . import auditoria
         print(auditoria.informe(auditoria.revisar(config.cargar())))

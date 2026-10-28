@@ -56,7 +56,7 @@
       <h1>RUA EZ-Fac · Guía de uso</h1>
       <p>Carga las facturas de proveedores de Vehicular, Hogar, Persona y ServiciosYa en DEUDA A PAGAR ARG.xlsx</p>
     </div>
-    <div class="ver">Versión 0.18 · alpha<br>Octubre 2026</div>
+    <div class="ver">Versión 0.19 · alpha<br>Octubre 2026</div>
   </header>
   <main>
     <div class="fila dos">
@@ -140,7 +140,7 @@
   <header>
     <img src="../../app/appfacturas/static/logo.png" alt="">
     <div><h1>RUA EZ-Fac · Guía de uso</h1><p>Qué hace sola y qué hacer si algo no anda</p></div>
-    <div class="ver">Versión 0.18 · alpha<br>Octubre 2026</div>
+    <div class="ver">Versión 0.19 · alpha<br>Octubre 2026</div>
   </header>
   <main>
     <div class="fila dos">
@@ -163,26 +163,37 @@
           <li>Cada área va a su hoja. Si falta la hoja de un área, solo esas facturas se frenan.</li>
           <li>Si un PDF no se pudo mover (OneDrive lo tenía tomado), su fila no se escribe hasta que se mueva.</li>
         </ul>
+        <h2 style="margin-top:4mm">☢ Borrar todo <span class="nuevo">nuevo</span></h2>
+        <ul>
+          <li>Configuración → <b>Zona de peligro</b> → <span class="btn">Borrar todo</span> deja la app como recién empezada:
+            facturas guardadas, <i>_Entrada</i>, proveedores, respaldos y todas las hojas de la planilla. No toca
+            config.toml, la clave de Claude ni nada más del OneDrive.</li>
+          <li>No borra: mueve todo a <i>_Borrado &lt;fecha&gt;</i> y antes guarda un zip en Documentos. Te muestra qué se va
+            y hay que escribir BORRAR TODO. Probalo primero en <i>Practicar</i> (solo toca la copia de prueba).</li>
+          <li><span class="btn">Deshacer el borrado total</span> devuelve todo sin pisar lo nuevo;
+            <span class="btn">Vaciar definitivamente</span> (escribir VACIAR) lo manda a la papelera.</li>
+        </ul>
       </div>
       <div class="tarjeta">
         <h2>Si algo no anda</h2>
         <table>
           <tr><td>"La planilla tiene cambios sin guardar"</td><td>Guardá en Excel y tocá
-            <span class="btn">Reintentar planilla</span> en Resultado. O <span class="btn">Copiar filas al portapapeles</span>
-            y pegalas con Ctrl+V en la columna A de la primera fila vacía.</td></tr>
+            <span class="btn">Reintentar planilla</span> en Resultado, o <span class="btn">Copiar filas al portapapeles</span>
+            y pegalas en la primera fila vacía.</td></tr>
           <tr><td>"Su archivo no se movió"</td><td>Cerrá el PDF si lo tenés abierto y tocá <span class="btn">Reintentar archivos</span>
             en Resultado. Nunca duplica filas.</td></tr>
           <tr><td>Se cerró la app a mitad de un lote</td><td>En Historial figura <i>quedó a medias</i>:
             <span class="btn">Terminar este lote</span> hace lo que faltó, o <span class="btn">Deshacer</span>.</td></tr>
-          <tr><td>Una factura no se leyó</td><td>Queda en <i>_Entrada</i>. En Revisión, <span class="btn">Leer ahora con la API de Claude</span> (con la clave en Configuración) o <span class="btn">Preparar el pedido</span> para Cowork.</td></tr>
+          <tr><td>Una factura no se leyó</td><td>Queda en <i>_Entrada</i>. En Revisión, <span class="btn">Leer ahora con la API de Claude</span> o <span class="btn">Preparar el pedido</span> para Cowork.</td></tr>
           <tr><td>Confirmé algo mal</td><td>Resultado o Historial → <span class="btn">Deshacer</span>. Solo revierte lo
             que nadie tocó después; el botón dice sobre qué planilla actúa.</td></tr>
           <tr><td>Un botón está gris</td><td>Estás en <b>Solo simular</b> (no se toca nada real) o la app está terminando
             otra tarea. Pasá el mouse para ver por qué.</td></tr>
           <tr><td>Falta la hoja Persona o ServiciosYa</td><td>Configuración → Setup → <span class="btn">Crear lo que falta</span>
-            (en el modo <i>Cargar en la planilla real</i>). Las agrega como copia vacía de las otras.</td></tr>
+            (en <i>Cargar en la planilla real</i>).</td></tr>
           <tr><td>Hice un reset y me arrepentí</td><td>Configuración → <span class="btn">Volver al respaldo del reset</span>,
-            mientras nadie haya tocado la planilla (cerrada en Excel). Los respaldos quedan en la carpeta <i>Respaldos</i>.</td></tr>
+            si nadie tocó la planilla.</td></tr>
+          <tr><td>"Excel no responde"</td><td>Cerrá los <b>Microsoft Excel</b> del Administrador de tareas y volvé a probar.</td></tr>
           <tr><td>Veo una versión vieja</td><td><span class="btn">Salir</span> y abrí el ícono de nuevo.</td></tr>
           <tr><td>No se abre la ventana</td><td>Abrí <b>Abrir RUA EZ-Fac (con consola).bat</b> para ver el error, o mirá <i>datos\app.log</i>.</td></tr>
           <tr><td>Le paso la app a un compañero</td><td>Que baje el zip de <i>github.com/tk3piernas/rua-ez-fac</i>, o usá

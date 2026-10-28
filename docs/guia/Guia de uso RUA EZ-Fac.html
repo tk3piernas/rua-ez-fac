@@ -16,7 +16,7 @@
   header h1 { margin: 0; font-size: 20pt; }
   header p { margin: 1mm 0 0; opacity: .85; font-size: 10pt; }
   header .ver { margin-left: auto; text-align: right; font-size: 9pt; opacity: .85; }
-  main { padding: 6mm 10mm 0; display: grid; gap: 4.5mm; }
+  main { padding: 5mm 10mm 0; display: grid; gap: 3.6mm; }
   .fila { display: grid; gap: 4.5mm; }
   .dos { grid-template-columns: 1fr 1fr; }
   .cuatro { grid-template-columns: repeat(4, 1fr); }
@@ -56,7 +56,7 @@
       <h1>RUA EZ-Fac · Guía de uso</h1>
       <p>Carga las facturas de proveedores de Vehicular, Hogar, Persona y ServiciosYa en DEUDA A PAGAR ARG.xlsx</p>
     </div>
-    <div class="ver">Versión 0.9 · alpha<br>Octubre 2026</div>
+    <div class="ver">Versión 0.13 · alpha<br>Octubre 2026</div>
   </header>
   <main>
     <div class="fila dos">
@@ -67,23 +67,23 @@
             <b>Documentos</b>. Nunca adentro de OneDrive: ahí no deja guardar programas.</li>
           <li>Doble clic en <b>Instalar o actualizar RUA EZ-Fac.bat</b>. Si falta Python, se abre la página:
             instalá el <i>Python install manager</i> y volvé a abrir el instalador.</li>
-          <li>Al final muestra una lista de <b>OK</b> y <b>FALTA</b>. Hace falta el OneDrive de RUA sincronizado,
-            la planilla en su raíz y Excel. Lo que falte (carpetas <i>_Entrada\&lt;área&gt;</i>, hojas de las áreas
-            nuevas, planilla vacía) lo crea la app: <b>Configuración → Setup → Revisar y preparar todo</b>.</li>
+          <li>Al final muestra una lista de <b>OK</b> y <b>FALTA</b>. Lo que falte lo crea la app:
+            <b>Configuración → Setup → Revisar y preparar todo</b> (una planilla vacía, solo si lo tildás aparte).</li>
           <li>Queda el ícono <b>RUA EZ-Fac</b> en el Escritorio y en el menú Inicio.</li>
         </ol>
       </div>
       <div class="tarjeta">
-        <h2>Abrir, cerrar y modos</h2>
+        <h2>Modo de trabajo <span class="nuevo">nuevo</span></h2>
+        <p style="margin:0 0 1.5mm">En <b>Configuración → Modo de trabajo</b> elegís uno. Siempre se ve arriba a la derecha.</p>
         <ul>
-          <li>Doble clic en el ícono: en unos segundos se abre en su propia ventana.</li>
-          <li>Arriba dice sobre qué trabajás: <b>CARPETA DE PRUEBA</b> o <b>carpetas y planilla REALES</b>.</li>
-          <li><span class="btn">Salir</span> (arriba a la derecha) cierra la ventana y la app.<span class="nuevo">nuevo</span></li>
-          <li><b>Para practicar:</b> Configuración → <i>Trabajar sobre la carpeta de prueba</i>. Usa una copia de las
-            carpetas y de la planilla; <span class="btn">Rearmar</span> la deja como nueva.</li>
-          <li><b>Escritura real:</b> mientras <i>Habilitar escritura real</i> esté apagado, sobre lo real la app solo
-            lee y simula.</li>
+          <li><b>Solo simular</b> (así arranca): lee tus facturas y muestra qué haría. No mueve ni escribe nada.</li>
+          <li><b>Practicar en la carpeta de prueba:</b> trabaja de verdad sobre una copia. Nunca toca la planilla real,
+            aunque la tengas abierta. <span class="btn">Rearmar la carpeta de prueba</span> la deja como nueva.</li>
+          <li><b>Cargar en la planilla real:</b> mueve las facturas en tu OneDrive y escribe en la planilla real.
+            Pide confirmación al elegirlo.</li>
         </ul>
+        <p class="gris" style="margin:1.5mm 0 0">Arriba: <span class="btn">N para leer</span> avisa si hay facturas
+          esperando (y cuántas son nuevas); un clic las lee. <span class="btn">Salir</span>, a la derecha de todo, cierra la app.</p>
       </div>
     </div>
 
@@ -91,77 +91,77 @@
       <h2>Uso diario, en cuatro pasos</h2>
       <div class="fila cuatro">
         <div class="tarjeta paso"><h3><span class="num">1</span>Cargar</h3>
-          Elegí el área (Vehicular, Hogar, Persona, ServiciosYa o <i>Detectar por proveedor</i>) y arrastrá los PDF,
-          zip o .txt, o dejalos en <i>_Entrada\&lt;área&gt;</i>. Tocá <span class="btn">Leer facturas</span>.
+          Elegí el área y arrastrá los PDF, zip o .txt (los .txt, con área elegida), o dejalos en
+          <i>_Entrada\&lt;área&gt;</i>. Tocá <span class="btn">Leer facturas</span>.
           <p class="gris">Leer no mueve ni escribe nada.</p></div>
         <div class="tarjeta paso"><h3><span class="num">2</span>Revisar</h3>
           Mirá los <b>Avisos</b>. En la tabla, <b>doble clic</b> para corregir proveedor, fechas, N° de tarea,
-          servicio o monto. Destildá <i>Cargar</i> para dejar una fila afuera. Fijate los proveedores nuevos y qué
-          archivos se mueven.</div>
+          servicio o monto (un proveedor nuevo cambia en todo). Destildá <i>Cargar</i> para dejar una fila afuera.</div>
         <div class="tarjeta paso"><h3><span class="num">3</span>Confirmar</h3>
           <span class="btn">Confirmar y cargar</span> mueve cada PDF a la carpeta de su proveedor
-          (<i>Factura 0002-00000189.pdf</i>), da de alta los proveedores nuevos y escribe las filas en la planilla,
-          esté abierta o cerrada.</div>
+          (<i>Factura 0002-00000189.pdf</i>), da de alta los proveedores nuevos y escribe las filas, con la planilla
+          abierta o cerrada. Si no hay avisos, carga sin preguntar.</div>
         <div class="tarjeta paso"><h3><span class="num">4</span>Controlar</h3>
-          <b>Resultado</b> muestra qué se hizo. Si algo no te gusta, <span class="btn">Deshacer este lote</span>
-          deja la planilla y las carpetas como estaban.
-          <p class="gris">También desde Historial (solo el último lote).</p></div>
+          <b>Resultado</b> muestra qué se hizo. <span class="btn">Deshacer este lote</span> deja la planilla y las
+          carpetas como estaban.
+          <p class="gris">Historial muestra todos los lotes, con fecha, tanda y dónde se cargaron (PRUEBA o REAL).</p></div>
       </div>
     </div>
 
     <div class="fila dos">
       <div class="tarjeta">
-        <h2>La planilla: abrir y exportar <span class="nuevo">nuevo</span></h2>
+        <h2>La planilla: revisar, exportar y cerrar la tanda</h2>
         <ul>
-          <li><span class="btn">Abrir planilla</span> (arriba) abre en Excel la planilla en la que está escribiendo
-            la app: la real o la copia de prueba.</li>
-          <li><span class="btn">Exportar planilla</span> guarda una copia con el nombre que elijas en la carpeta
-            <i>Planillas exportadas</i>, al lado de la planilla. Incluye lo que Excel tenga sin guardar y la planilla
-            sigue igual. Nunca pisa otra con el mismo nombre; después podés abrirla o deshacer.</li>
-          <li>Para empezar la tanda siguiente de cero: Configuración → <span class="btn">Reset de la planilla</span>.</li>
+          <li>Pestaña <b>Revisar</b><span class="nuevo">nuevo</span>: compara la planilla con las carpetas y te dice qué
+            mirar (links rotos, filas repetidas o sin link, PDF que no están en ninguna fila, proveedores sin datos de
+            pago, archivos viejos). Solo lee.</li>
+          <li><span class="btn">Abrir planilla</span> la abre en Excel; <span class="btn">Exportar planilla</span> guarda una copia.</li>
+          <li><b>Historial → Tanda de pagos</b><span class="nuevo">nuevo</span>: <span class="btn">Cerrar la tanda</span>
+            guarda la copia <i>… tanda N</i>, anota sus lotes y, si querés, deja la planilla vacía. Se puede deshacer.</li>
         </ul>
       </div>
       <div class="tarjeta">
-        <h2>Datos de los proveedores <span class="nuevo">nuevo</span></h2>
+        <h2>Datos de los proveedores</h2>
         <ul>
           <li>Pestaña <b>Proveedores</b>: pegá los datos como vengan (mail, WhatsApp, .txt) y tocá
             <span class="btn">Leer los datos</span>.</li>
           <li>La app arma la ficha (CUIT, CBU/CVU, alias, banco, contacto), chequea CUIT y CBU y te muestra si ya
             estaba y qué cambia. Corregí lo que haga falta y <span class="btn">Guardar en la memoria</span>.</li>
-          <li>Se guardan en <b>PROVEEDORES RUA.xlsx</b> (OneDrive, al lado de la planilla), que no se pierde con las
-            actualizaciones. Cada planilla nueva o exportada toma de ahí los datos de sus proveedores.</li>
-          <li>Los datos que llegan en .txt con un lote se guardan solos. Todo se puede deshacer.</li>
+          <li>Se guardan en <b>PROVEEDORES RUA.xlsx</b> (OneDrive, al lado de la planilla); los que llegan en .txt con un
+            lote se guardan solos. Todo se puede deshacer.</li>
         </ul>
       </div>
     </div>
   </main>
-  <footer><span>Todo queda registrado en la carpeta de la app → datos (lotes, informes, respaldos).</span><span>1 / 2</span></footer>
+  <footer><span>Todo queda registrado en la carpeta de la app → datos (lotes, informes, respaldos, tandas).</span><span>1 / 2</span></footer>
 </section>
 
 <section class="hoja">
   <header>
     <img src="../../app/appfacturas/static/logo.png" alt="">
     <div><h1>RUA EZ-Fac · Guía de uso</h1><p>Qué hace sola y qué hacer si algo no anda</p></div>
-    <div class="ver">Versión 0.9 · alpha<br>Octubre 2026</div>
+    <div class="ver">Versión 0.13 · alpha<br>Octubre 2026</div>
   </header>
   <main>
     <div class="fila dos">
       <div class="tarjeta">
         <h2>Qué significa cada color de la tabla</h2>
         <p><span class="color" style="background:#fff6d5"></span><b>Amarillo:</b> posible duplicado. Se carga marcada en amarillo.</p>
-        <p><span class="color" style="background:#fde2e1"></span><b>Rojo:</b> frenada, no se carga.</p>
+        <p><span class="color" style="background:#fde2e1"></span><b>Rojo:</b> frenada. No se carga y no se puede tildar; el resto del lote sigue.</p>
         <p><span class="color" style="background:#efe7fb"></span><b>Violeta:</b> la leyó Claude. Revisala con más cuidado.</p>
         <p><span class="color"></span><s>Tachada</s>: la dejaste afuera.</p>
         <h2 style="margin-top:4mm">Qué hace sola</h2>
         <ul>
-          <li>No carga lo que ya está en la planilla, en la carpeta del proveedor o repetido en el lote.</li>
-          <li>Si llega el mismo número de factura con otro importe, la frena y queda en <i>_Entrada</i>.</li>
-          <li>IVA (columna H): Factura B, Factura C y comprobantes sin CAE = 0. En la Factura A deja la fórmula,
-            salvo que el IVA real sea distinto. Factura A: en el monto va el neto. Nunca toca la columna I.</li>
-          <li>N° de tarea: 6 cifras, tomado del detalle de la factura. CUIT, cuenta y CBU van como texto.</li>
-          <li>Completa la hoja Proveedores con los datos del .txt o de la memoria de proveedores.</li>
-          <li>Cada área va a su hoja: Vehicular, Hogar, Persona o ServiciosYa. Si a la planilla le falta la hoja de
-            un área, esas facturas quedan frenadas hasta que Setup la agregue.</li>
+          <li>No carga lo que ya está en la planilla, en la carpeta del proveedor o repetido en el lote. El mismo número
+            con otro importe (en el lote o contra un PDF ya guardado) se frena y queda en <i>_Entrada</i>.</li>
+          <li>IVA (columna H): Factura B, Factura C y comprobantes sin CAE = 0. Factura A: en G va el neto (más lo
+            no gravado y exento) y en H la fórmula, salvo que el IVA real sea distinto. Una Factura A sin neto leído
+            se frena. Nunca toca la columna I.</li>
+          <li>Recibos y notas de venta llevan su propio nombre (<i>Recibo 0001-…</i>) y no chocan con la factura del mismo número.</li>
+          <li>N° de tarea: 6 cifras del detalle (nunca un precio). El vencimiento nunca es el del CAE. CUIT, cuenta y
+            CBU van como texto.</li>
+          <li>Cada área va a su hoja. Si falta la hoja de un área, solo esas facturas se frenan.</li>
+          <li>Si un PDF no se pudo mover (OneDrive lo tenía tomado), su fila no se escribe hasta que se mueva.</li>
         </ul>
       </div>
       <div class="tarjeta">
@@ -170,17 +170,23 @@
           <tr><td>"La planilla tiene cambios sin guardar"</td><td>Guardá en Excel y tocá
             <span class="btn">Reintentar planilla</span> en Resultado. O <span class="btn">Copiar filas al portapapeles</span>
             y pegalas con Ctrl+V en la columna A de la primera fila vacía.</td></tr>
+          <tr><td>"Su archivo no se movió"</td><td>Cerrá el PDF si lo tenés abierto y tocá <span class="btn">Reintentar archivos</span>
+            en Resultado. Nunca duplica filas.</td></tr>
+          <tr><td>Se cerró la app a mitad de un lote</td><td>En Historial figura <i>quedó a medias</i>:
+            <span class="btn">Terminar este lote</span> hace lo que faltó, o <span class="btn">Deshacer</span>.</td></tr>
           <tr><td>Una factura no se leyó</td><td>Queda en <i>_Entrada</i> con su aviso. Cargala a mano o pasásela a Claude.</td></tr>
           <tr><td>Confirmé algo mal</td><td>Resultado o Historial → <span class="btn">Deshacer</span>. Solo revierte lo
-            que nadie tocó después. Tocalo una sola vez: si ya estaba deshecho, avisa y no hace nada.</td></tr>
+            que nadie tocó después; el botón dice sobre qué planilla actúa.</td></tr>
+          <tr><td>Un botón está gris</td><td>Estás en <b>Solo simular</b> (no se toca nada real) o la app está terminando
+            otra tarea. Pasá el mouse para ver por qué.</td></tr>
           <tr><td>Falta la hoja Persona o ServiciosYa</td><td>Configuración → Setup → <span class="btn">Crear lo que falta</span>
-            (con la escritura real habilitada). Las agrega como copia vacía de las otras y antes guarda respaldos.</td></tr>
-          <tr><td>Veo una versión vieja</td><td><span class="btn">Salir</span> y abrí el ícono de nuevo. La versión vieja se cierra sola.</td></tr>
+            (en el modo <i>Cargar en la planilla real</i>). Las agrega como copia vacía de las otras.</td></tr>
+          <tr><td>Hice un reset y me arrepentí</td><td>Configuración → <span class="btn">Volver al respaldo del reset</span>,
+            mientras nadie haya tocado la planilla (cerrada en Excel). Los respaldos quedan en la carpeta <i>Respaldos</i>.</td></tr>
+          <tr><td>Veo una versión vieja</td><td><span class="btn">Salir</span> y abrí el ícono de nuevo.</td></tr>
           <tr><td>No se abre la ventana</td><td>Abrí <b>Abrir RUA EZ-Fac (con consola).bat</b> para ver el error, o mirá <i>datos\app.log</i>.</td></tr>
-          <tr><td>Quiero la planilla vacía</td><td>Exportala si la querés guardar, y después Configuración →
-            <span class="btn">Reset de la planilla</span>, escribí BORRAR. Vacía las filas (no el formato ni la columna I) y antes guarda dos respaldos.</td></tr>
           <tr><td>Le paso la app a un compañero</td><td>Que baje el zip de <i>github.com/tk3piernas/rua-ez-fac</i>, o usá
-            <b>Armar instalador para otra PC.bat</b>. Descomprime en Documentos y abre el instalador.</td></tr>
+            <b>Armar instalador para otra PC.bat</b>.</td></tr>
         </table>
       </div>
     </div>

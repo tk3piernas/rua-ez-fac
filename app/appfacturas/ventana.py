@@ -87,6 +87,56 @@ def marcar_cuando_aparezca(espera: float = 25.0) -> None:
     threading.Thread(target=correr, daemon=False).start()   # not daemon: also when the launcher ends right away
 
 
+_candado = None                     # kept for the whole life of the process that starts the server
+
+
+def tomar_candado() -> bool:
+    """True if this is the only launcher starting the app right now (a named mutex). Several quick clicks on
+    the icon start several launchers: only the first starts the server, the rest wait and show its window."""
+    global _candado
+    if sys.platform != "win32":
+        return True
+    try:
+        import win32api
+        import win32event
+        import winerror
+        _candado = win32event.CreateMutex(None, False, "Local\\RUA.EZFac.inicio")
+        return win32api.GetLastError() != winerror.ERROR_ALREADY_EXISTS
+    except Exception:
+        return True
+
+
+def traer_al_frente(hwnd: int) -> bool:
+    """Restores the window if minimized and brings it to the front."""
+    try:
+        import win32con
+        import win32gui
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        else:
+            win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+        win32gui.SetForegroundWindow(hwnd)
+        return True
+    except Exception:
+        try:
+            import win32gui
+            win32gui.BringWindowToTop(hwnd)
+            return True
+        except Exception:
+            return False
+
+
+def mostrar_la_abierta() -> bool:
+    """If the app already has a window, brings it to the front instead of opening another one."""
+    if sys.platform != "win32":
+        return False
+    try:
+        hs = ventanas()
+    except Exception:
+        return False
+    return bool(hs) and traer_al_frente(hs[0])
+
+
 def acceso_directo(ruta: Path, carpeta_app: Path) -> None:
     """A .lnk that starts the app, with its icon and the same AppUserModelID as the window."""
     import pythoncom

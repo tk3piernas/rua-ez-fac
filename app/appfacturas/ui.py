@@ -1528,6 +1528,16 @@ def panel_config(refrescar_modo):
                     "color=negative outline")
                 volver_reset_boton()
 
+        with seccion("Ventana", "web_asset", "w-[760px]"):
+            def cambiar_ventanas(e):
+                config.guardar_opcion(cfg_real.archivo, "app", "varias_ventanas", bool(e.value))
+                ui.notify("Listo: " + ("cada clic en el ícono abre otra ventana" if e.value else
+                                       "un clic en el ícono trae al frente la ventana que ya está abierta"))
+            ui.switch("Permitir abrir más de una ventana de la app", value=cfg_real.varias_ventanas,
+                      on_change=cambiar_ventanas)
+            ui.label("Apagado: si la app ya está abierta, tocar el ícono trae al frente esa ventana en vez de abrir "
+                     "otra.").classes("text-xs text-gray-500 text-center")
+
         panel_clave_claude()
 
         with seccion("Cómo se carga", "tune", "w-[760px]"):
@@ -1845,13 +1855,34 @@ def _abrir_cuando_este_lista(url: str, puerto: int) -> None:
     threading.Thread(target=esperar, daemon=True).start()
 
 
+def mostrar_app(url: str, cfg) -> None:
+    """The app is already running: bring its window to the front, or open one if there is none
+    (or always another one, with [app] varias_ventanas = true)."""
+    from . import ventana
+    if not cfg.varias_ventanas and ventana.mostrar_la_abierta():
+        return
+    abrir_ventana(url)
+
+
 def main(abrir_navegador: bool = True) -> None:
+    import time
+    from . import ventana
     cfg = config.cargar()
     url = f"http://127.0.0.1:{cfg.puerto}"
+    if not ventana.tomar_candado():
+        # another click is already starting the app: wait for it and show its window
+        for _ in range(150):
+            if _puerto_ocupado(cfg.puerto):
+                break
+            time.sleep(0.2)
+        if abrir_navegador:
+            time.sleep(1.5)            # its window opens right after the server
+            mostrar_app(url, cfg)
+        return
     if _puerto_ocupado(cfg.puerto):
         if _version_corriendo(url) == __version__ or not _cerrar_viejo(cfg.puerto):
             if abrir_navegador:
-                abrir_ventana(url)    # same version already running (or could not close the old one): just show it
+                mostrar_app(url, cfg)  # same version already running (or could not close the old one)
             return
     if sys.stdout is None:            # pythonw: no console, log to a file
         log = datos() / "app.log"

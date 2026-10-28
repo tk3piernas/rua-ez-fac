@@ -49,6 +49,8 @@ empresa_hogar = ""
 
 [app]
 puerto = 8765
+# false = tocar el ícono con la app abierta trae al frente la ventana que ya está (no abre otra)
+varias_ventanas = false
 # false = la app solo simula sobre las carpetas y la planilla reales (las escrituras van a la carpeta de prueba).
 # Lo cambia Matheo desde Configuración cuando aprueba usar la planilla real.
 modo_real = false
@@ -70,6 +72,7 @@ class Config:
     defaults: dict = field(default_factory=dict)
     escribir_servicio: bool = False
     puerto: int = 8765
+    varias_ventanas: bool = False        # clicking the icon with the app open opens another window
     modo_real: bool = False
     excel_motor: str = "com"          # "openpyxl" only in tests (there is no Excel in the cloud)
     archivo: Path | None = None
@@ -160,6 +163,7 @@ def cargar(ruta: Path | None = None, base: Path | None = None) -> Config:
     c.defaults = {k: v for k, v in pl.items() if v and isinstance(v, str)}
     c.escribir_servicio = bool(pl.get("escribir_servicio", False))
     c.puerto = int(ap.get("puerto", c.puerto))
+    c.varias_ventanas = bool(ap.get("varias_ventanas", False))
     c.modo_real = bool(ap.get("modo_real", False))
     return c
 

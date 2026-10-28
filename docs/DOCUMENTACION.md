@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.9.3 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.9.4 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -137,11 +137,14 @@ Estructura de la carpeta de la app:
 - **Parsers** (`parsers\`, se registran solos):
   - `arca.py` lee por posición: el valor está a la derecha de su etiqueta.
   - `generico.py` arma líneas por posición. Cubre MDQ, el estilo Santiago SOS y los comprobantes no fiscales, como los de ABC con número "FAC0297".
-- **N° de tarea:** 6 cifras entre 300000 y 999999. Se toma solo del detalle de la factura; el nombre del archivo es apenas una pista.
+- **N° de tarea:** 6 cifras entre 300000 y 999999. Se toma solo del detalle de la factura; el nombre del archivo es apenas una pista. No se toma un número precedido por "$" o por precio, importe, total, monto o unitario (salvo que diga tarea, exp. o servicio en el medio).
+- **CUIT del emisor (lector genérico):** entre los CUIT válidos que no son de RUA, se prefiere el que está en una línea con la etiqueta "CUIT" en el tercio de arriba de la página. Si hay más de uno, aviso REVISAR "hay varios CUIT".
+- **Tipos de comprobante:** Factura, Nota de Crédito, Nota de Débito, Recibo (códigos 4, 9, 15 y 54) y Nota de Venta (5 y 10). El tipo va en el nombre del archivo y en la clave de duplicado, así un Recibo no choca con la Factura del mismo número.
+- **ARCA sin "Período Facturado"** (facturas de productos): el corte entre emisor y receptor se toma justo arriba del "CUIT:" del receptor.
 - **Claves de duplicado:**
   - Factura fiscal: `CUIT|tipo|PV|nro`.
   - No fiscal: `SC:<nombre normalizado>|tipo|FAC…`.
-  - Mismo número con otro importe: se frena (BLOQUEA) y queda en `_Entrada`.
+  - Mismo número con otro importe: se frena (BLOQUEA) y queda en `_Entrada`, tanto dentro del lote como contra un PDF ya guardado en la carpeta del proveedor.
 - **Avisos BLOQUEA:** la factura se ve en la grilla en rojo, con "Cargar" destildado y sin poder tildarlo. No se mueve ni genera filas, así que el resto del lote se carga igual (por ejemplo, si a la planilla le falta la hoja de un área).
 - **Columna H (IVA):**
   - Factura B, Factura C y no fiscal: 0.
@@ -151,11 +154,13 @@ Estructura de la carpeta de la app:
   - Si no, queda la fórmula.
   - La columna I nunca se toca.
 - **Factura A:** en G va el neto, no el total. El script viejo cargaba el total y contaba el IVA dos veces.
+  - "Importe Neto No Gravado" e "Importe Exento" (peajes, viáticos) se suman a G sin IVA, y H lleva el IVA real (difiere de la fórmula, así que se pisa). Un ítem "Exento" o "No Gravado" va con H en 0.
 - **Fechas:**
   - E: fecha del servicio ("Desde"); si no hay, la emisión.
   - F: vencimiento; si no hay, la emisión, con aviso. Nunca el vencimiento del CAE.
   - Se leen dd/mm/aaaa (también con - o .), aaaa-mm-dd y fechas con el mes en letras.
-- **CUIT, teléfono, número de cuenta y CBU:** siempre como texto.
+- **CUIT, teléfono, número de cuenta y CBU:** siempre como texto. Un CUIT cargado a mano como número en la hoja Proveedores se reconoce igual; un CBU cargado como número perdió dígitos en Excel y se ignora.
+- **Fórmulas:** solo H y J se escriben como fórmula. Cualquier otro valor que empiece con "=" (un alias, una observación) va como texto.
 - **.txt de proveedores:**
   - Varias cuentas: la primera va a la fila y las demás a Observaciones.
   - El banco se saca del CBU (384 = Ualá Bank, ex Wilobank).
@@ -199,7 +204,7 @@ Estructura de la carpeta de la app:
 
 ## Pruebas
 
-- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, archivos que no se movieron, memoria y reset que se deshacen, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
+- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, Recibo y Nota de Venta, tarea vs precio, CUIT del emisor, No Gravado, ARCA sin período, Nota de Débito, IVA 10,5 %, PDF escaneado y con contraseña, original y duplicado en un PDF, zip con subcarpetas, .txt con dos CBU, mismo número contra las carpetas, archivos que no se movieron, memoria y reset que se deshacen, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
 - `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
 - Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Las dos usan openpyxl y tardan segundos. La prueba que abre Excel de verdad (COM) corre solo si se pide: `python -m pytest -q -m excel app\tests_privados` (un minuto y medio).
 - También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).

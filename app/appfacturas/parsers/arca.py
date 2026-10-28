@@ -29,7 +29,13 @@ class Arca(Parser):
         e = Extraccion(fuente=self.nombre)
         pg = doc.paginas[0]
         sp = pg.spans
-        y_periodo = (buscar_label(sp, r"Per[ií]odo Facturado Desde") or Span(0, 175, 0, 175, "")).yc
+        periodo = buscar_label(sp, r"Per[ií]odo Facturado Desde")
+        if periodo:
+            y_periodo = periodo.yc
+        else:
+            # invoices for products have no period: the issuer / receiver cut is just above the receiver's "CUIT:"
+            cuits = sorted(s.yc for s in sp if re.match(r"CUIT:", s.texto))
+            y_periodo = cuits[1] - 3 if len(cuits) > 1 else 175
         hdr_prod = buscar_label(sp, r"Producto\s*/\s*Servicio")
         y_items = hdr_prod.yc if hdr_prod else y_periodo + 80
 
@@ -81,6 +87,8 @@ class Arca(Parser):
         tot = lambda pat: parse_monto(valor_de(sp, pat, y_min=y_items))
         e.total = tot(r"Importe Total:\s*\$?")
         e.neto = tot(r"Importe Neto Gravado:\s*\$?")
+        sin_iva = [v for v in (tot(r"Importe Neto No Gravado:\s*\$?"), tot(r"Importe Exento:\s*\$?")) if v]
+        e.no_gravado = suma(sin_iva) if sin_iva else None
         vals_otros = [parse_monto(valor_de(sp, r"Importe Otros Tributos:\s*\$?", y_min=s.yc - 1, y_max=s.yc + 1))
                       for s in sp if s.yc > y_items and s.texto.startswith("Importe Otros Tributos")]
         e.otros_tributos = max((v for v in vals_otros if v is not None), default=None)
@@ -154,6 +162,8 @@ def _items(sp: list[Span], hdr_prod: Span | None, y_items: float, cfg) -> list[I
         alic = next((s for s in fila if re.fullmatch(r"\d+(?:[.,]\d+)?\s*%", s.texto)), None)
         bruto = parse_monto(montos[-1].texto)
         neto, iva = bruto, None
+        if not alic and any(re.match(r"(?i)(exento|no gravado)", s.texto) for s in fila):
+            iva = Decimal(0)                 # an exempt / not-taxed item carries no IVA
         if alic:
             antes = [s for s in montos if s.x1 <= alic.x0]
             if antes:

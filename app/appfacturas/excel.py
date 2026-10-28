@@ -94,11 +94,16 @@ class HojaOpenpyxl:
     def valor(self, r, c):
         return self.formula(r, c) if not str(self.formula(r, c)).startswith("=") else None
 
-    def poner(self, r, c, v, texto=False):
+    def poner(self, r, c, v, texto=False, formula=False):
+        """`formula`: a value starting with "=" is a formula (only H and J of the rows, and undo); otherwise
+        it is written as text, so a pasted "=ver mail" never becomes #NAME?."""
         cell = self.ws[f"{c}{r}"]
         if texto:
             cell.number_format = "@"
         cell.value = v if v != "" else None
+        if isinstance(v, str) and v.startswith("=") and not formula:
+            cell.number_format = "@"
+            cell.data_type = "s"
 
     def color(self, r, c):
         f = self.ws[f"{c}{r}"].fill
@@ -269,11 +274,16 @@ class HojaCOM:
     def valor(self, r, c):
         return self._c(r, c).Value2
 
-    def poner(self, r, c, v, texto=False):
+    def poner(self, r, c, v, texto=False, formula=False):
+        """`formula`: a value starting with "=" is a formula (only H and J of the rows, and undo); otherwise
+        it is written as text, so a pasted "=ver mail" never becomes #NAME?."""
         cell = self._c(r, c)
         if texto:
             cell.NumberFormat = "@"
-        if isinstance(v, str) and v.startswith("="):
+        if isinstance(v, str) and v.startswith("=") and not formula:
+            cell.NumberFormat = "@"
+            cell.Value2 = v
+        elif isinstance(v, str) and v.startswith("="):
             cell.Formula = v
         elif v == "" or v is None:
             cell.ClearContents()
@@ -497,7 +507,7 @@ def _escribir_todo(cfg, libro, filas, provs, hojas, ocupadas, anotar, log):
                 "comentario_antes": h.comentario(r, "A") if f.comentario else None,
                 "comentado": bool(f.comentario), "factura": f.factura_id})
         for c, v in escrito.items():
-            h.poner(r, c, v, texto=c in texto)
+            h.poner(r, c, v, texto=c in texto, formula=c in ("H", "J"))
         if f.resaltar:
             for c in COLS:
                 h.pintar(r, c, True)
@@ -536,7 +546,7 @@ def _restaurar(libro, p, problemas, log) -> None:
             problemas.append(f"{p['hoja']} fila {r} cambió después del lote; no la toco")
             return
         for c in p["escrito"]:
-            h.poner(r, c, p["antes"].get(c, ""))
+            h.poner(r, c, p["antes"].get(c, ""), formula=True)      # back exactly as it was
         for c, col in (p.get("colores") or {}).items():
             h.pintar(r, c, col)
         if p.get("comentado"):

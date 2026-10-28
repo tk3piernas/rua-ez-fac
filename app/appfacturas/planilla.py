@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from .config import AREAS
+from .maestro import _texto
 from .util import solo_digitos
 
 PRIMERA, ULTIMA = 12, 210
@@ -97,14 +98,22 @@ def leer(ruta: Path | None, hojas=AREAS) -> Planilla:
             for r in range(5, 301):
                 vals = [ws.cell(r, c).value for c in range(1, 16)]
                 nombre = str(vals[1] or "").strip()
-                cuit = solo_digitos(str(vals[2] or ""))
+                # typed by hand as a number: 20123456789.0 -> "20123456789" (B4)
+                cuit = solo_digitos(_texto(vals[2]))
                 if not nombre and not cuit:
                     continue
                 pl.proveedores.append({"fila": r, "area": str(vals[0] or ""), "nombre": nombre, "cuit": cuit,
-                                       "cbu": solo_digitos(str(vals[11] or ""))})
+                                       "cbu": _cbu(vals[11])})
     finally:
         wb.close()
     return pl
+
+
+def _cbu(v) -> str:
+    """A CBU typed as a number lost its last digits (Excel keeps 15): better unknown than wrong."""
+    if isinstance(v, float):
+        return ""
+    return solo_digitos(_texto(v))
 
 
 def num_de(s: str) -> str | None:

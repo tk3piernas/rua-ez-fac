@@ -40,7 +40,7 @@ def sandbox(tmp_path):
 
 
 def factura(ruta, nro, letra="A", neto="100.000,00", iva="21.000,00", total="121.000,00", items=None,
-            vto_pago=True):
+            vto_pago=True, extras=(), cabecera=""):
     """Synthetic invoice for the generic reader. Lines with None are left out."""
     doc = pymupdf.open()
     pg = doc.new_page(width=595, height=842)
@@ -48,6 +48,8 @@ def factura(ruta, nro, letra="A", neto="100.000,00", iva="21.000,00", total="121
     def t(x, y, s, size=9):
         pg.insert_text((x, y), s, fontsize=size)
     t(30, 40, "GRUAS INVENTADAS DEL PLATA", 13)
+    if cabecera:
+        t(30, 22, cabecera)
     t(290, 45, letra, 24)
     t(285, 60, "Cod. 01" if letra == "A" else "Cod. 11", 8)
     t(360, 40, "FACTURA", 14)
@@ -65,6 +67,8 @@ def factura(ruta, nro, letra="A", neto="100.000,00", iva="21.000,00", total="121
     if iva:
         t(380, 615, "IVA 21%:"); t(520, 615, iva)
     t(380, 630, "Total:"); t(520, 630, total)
+    for k, (label, monto) in enumerate(extras):
+        t(380, 645 + 12 * k, label); t(520, 645 + 12 * k, monto)
     if vto_pago:
         t(30, 660, "Fecha de venc. de pago: 30/11/2026")
     t(30, 700, "CAE: 76123456789012")
@@ -149,3 +153,26 @@ def test_vencimiento_no_es_el_del_cae(sandbox):
     assert f.ext.vto == datetime.date(2026, 10, 15)
     factura(sandbox.entrada / "Vehicular" / "c.pdf", 25)
     assert armar(sandbox).facturas[0].ext.vto == datetime.date(2026, 11, 30)
+
+
+def test_no_gravado_va_en_g_y_h_lleva_el_iva_real(sandbox):
+    """C5: taxed 100.000 + not taxed 5.000 (tolls) + IVA 21.000 = 126.000: G 105.000, H 21.000, I 126.000."""
+    factura(sandbox.entrada / "Vehicular" / "ng.pdf", 41, neto="100.000,00", iva="21.000,00", total="126.000,00",
+            extras=[("No Gravado:", "5.000,00")])
+    lote = armar(sandbox)
+    f = lote.facturas[0]
+    assert (f.ext.neto, f.ext.no_gravado) == (D("100000.00"), D("5000.00"))
+    (r,) = lote.filas
+    assert (r.monto, r.iva) == (D("105000.00"), D("21000.00"))
+    assert not [a for a in lote.avisos if a.codigo == "total"]
+
+
+OTRO_CUIT = _cuit("3069999888")
+
+
+def test_cuit_del_emisor_es_el_de_la_etiqueta_arriba(sandbox):
+    """C3: another valid CUIT printed before the issuer's (a carrier, a bank) is not taken as the provider."""
+    factura(sandbox.entrada / "Vehicular" / "c3.pdf", 51, cabecera=f"Transporte asociado {_fmt(OTRO_CUIT)}")
+    lote = armar(sandbox)
+    assert lote.facturas[0].ext.cuit == CUIT
+    assert any("varios CUIT" in a.texto and a.nivel == Nivel.REVISAR for a in lote.avisos)

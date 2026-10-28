@@ -196,6 +196,15 @@ class Armador:
             f.estado, f.dup, f.a_duplicados = Estado.DUPLICADA, f"es la misma factura que {self.en_cola[f.clave]}", True
             return f
         existente = self.idx.buscar(f.clave, arch.tamano, arch.sha256, excluir=ruta) if self.idx else None
+        if existente and e.total is not None and self.idx.hash_de(existente) != arch.sha256:
+            # same number already saved, but another file: if the amount differs it is not the same invoice
+            otro_total = self._total_de(existente)
+            if otro_total is not None and abs(otro_total - e.total) > CENT:
+                f.estado = Estado.REVISAR
+                f.dup = (f"tiene el mismo número que {self.idx.rel(existente)} pero otro importe "
+                         f"({fmt_monto(e.total)} contra {fmt_monto(otro_total)}): revisalo antes de cargarlo")
+                self.lote.aviso(Nivel.BLOQUEA, "mismo_numero", f"{nombre}: {f.dup}", f.id)
+                return f
         if existente:
             f.existente, f.a_duplicados = existente, True
             carpeta, area_link, archivo = existente.parent.name, existente.parent.parent.name, existente.name
@@ -222,11 +231,21 @@ class Armador:
         f.estado = Estado.REVISAR if any(a.ref == f.id and a.nivel != Nivel.INFO for a in self.lote.avisos) else Estado.LISTA
         return f
 
+    def _total_de(self, ruta: Path):
+        """Total of an invoice already saved in the folders (None if it can't be read)."""
+        try:
+            doc = pdf.leer(ruta)
+            parser, _ = parsers.elegir(doc, ruta.name) if doc.paginas else (None, 0)
+            return parser.extraer(doc, ruta.name, self.cfg).total if parser else None
+        except Exception:
+            return None
+
     # ------------------------------------------------------------ amounts
     def _importes(self, f: Factura, e) -> None:
         if e.letra in ("A", "M") and e.neto is not None:
-            f.monto = e.neto
-            resto = (e.total - e.neto - (e.otros_tributos or 0)).quantize(CENT) if e.total is not None else None
+            # G = everything paid without IVA: taxed net + not taxed + exempt (tolls, travel...)
+            f.monto = e.neto + (e.no_gravado or 0)
+            resto = (e.total - f.monto - (e.otros_tributos or 0)).quantize(CENT) if e.total is not None else None
             if e.iva:
                 f.iva = e.iva
             elif resto is not None and resto > 0:
@@ -257,11 +276,11 @@ class Armador:
             av(Nivel.REVISAR, "factura_b", "es Factura B: el monto ya incluye el IVA, H va en 0")
         if e.items:
             s = sum((i.monto or Decimal(0) for i in e.items), Decimal(0))
-            ref = e.neto if e.letra in ("A", "M") and e.neto is not None else e.total
+            ref = e.neto + (e.no_gravado or 0) if e.letra in ("A", "M") and e.neto is not None else e.total
             if ref is not None and abs(s - ref) > CENT:
                 av(Nivel.REVISAR, "suma_items", f"la suma de los ítems ({fmt_monto(s)}) no coincide con {fmt_monto(ref)}")
         if e.letra in ("A", "M") and None not in (e.neto, e.total):
-            calc = e.neto + (e.iva or 0) + (e.otros_tributos or 0)
+            calc = e.neto + (e.no_gravado or 0) + (e.iva or 0) + (e.otros_tributos or 0)
             if abs(calc - e.total) > CENT:
                 av(Nivel.REVISAR, "total", f"neto + IVA + otros ({fmt_monto(calc)}) no da el total ({fmt_monto(e.total)})")
         if e.otros_tributos:
@@ -297,7 +316,7 @@ class Armador:
             av(Nivel.INFO, "tareas_archivo", f"el nombre del archivo menciona {', '.join(e.tareas_archivo)}; "
                "no las cargo en B (completalas en la revisión si corresponden)")
         for nota in e.notas:
-            av(Nivel.REVISAR if re.search(r"no fiscal|vencimiento|no coincide", nota) else Nivel.INFO, "nota", nota)
+            av(Nivel.REVISAR if re.search(r"no fiscal|vencimiento|no coincide|varios CUIT", nota) else Nivel.INFO, "nota", nota)
 
     # ------------------------------------------------------------ duplicates vs the sheet (PS1 Revisar-Factura)
     def _duplicados_planilla(self) -> None:

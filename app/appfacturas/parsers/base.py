@@ -38,6 +38,10 @@ def tipo_de_codigo(cod: int | None) -> tuple[str, str]:
         tipo = "Nota de Crédito"
     elif cod in (2, 7, 12, 52, 202, 207, 212):
         tipo = "Nota de Débito"
+    elif cod in (4, 9, 15, 54):
+        tipo = "Recibo"
+    elif cod in (5, 10):
+        tipo = "Nota de Venta"           # nota de venta al contado
     else:
         tipo = "Factura"
     return letra, tipo
@@ -59,11 +63,18 @@ def tareas_en(texto: str, tmin: int, tmax: int) -> list[str]:
     Differs from the PS1 on purpose: "406419, 406800" and "406419/406800" are read
     (the PS1 skipped a number followed by a comma or glued to a slash)."""
     out = []
-    for m in re.finditer(r"(?<![\d.,-])(\d{6})(?!\d|[.,]\d|-\d)", texto or ""):
+    texto = texto or ""
+    for m in re.finditer(r"(?<![\d.,-])(\d{6})(?!\d|[.,]\d|-\d)", texto):
         v = m.group(1)
+        antes = texto[max(0, m.start() - 30):m.start()]
+        if _ES_PRECIO.search(antes):
+            continue                         # "Precio unitario 350000", "$ 350000": an amount, not a task
         if tmin <= int(v) <= tmax and v not in out:
             out.append(v)
     return out
+
+
+_ES_PRECIO = re.compile(r"(?i)(\$\s*|\b(?:precio|importe|total|subtotal|monto|unitario|p\.\s?unit\.?)\b(?:(?!tarea|exp|servicio)[^\d\n]){0,15})$")
 
 
 # ------------------------------------------------------------- span helpers

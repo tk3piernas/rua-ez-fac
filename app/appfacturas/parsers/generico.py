@@ -96,13 +96,22 @@ class Generico(Parser):
         if e.nro is None:
             e.numero_txt = _buscar(r"(?i)\bN(?:[uú]mero|ro\.?|\s*[º°])\s*:?\s*([A-Z]{0,4}-?\d{2,10})\b", texto)
 
-        # --- issuer CUIT: valid, not RUA; the receiver line ("Cliente", "C.U.I.T.:" next to RUA) is skipped
-        cuits = []
-        for mm in _CUIT_RE.finditer(texto):
-            c = "".join(mm.groups())
-            if c != cfg.cuit_rua and cuit_valido(c) and c[:2] in ("20", "23", "24", "27", "30", "33", "34") and c not in cuits:
-                cuits.append(c)
-        e.cuit = cuits[0] if cuits else ""
+        # --- issuer CUIT: valid, not RUA. Preferred: on a line with the "CUIT" label in the top third of the
+        # page (the issuer's header), over a bank's, a carrier's or an accountant's CUIT printed elsewhere
+        cuits: list[str] = []
+        puntaje: dict[str, tuple] = {}
+        alto = pg.alto or 842
+        for orden, l in enumerate(L):
+            etiqueta = bool(re.search(r"(?i)c\.?\s?u\.?\s?i\.?\s?t", l.texto))
+            arriba = l.y < alto / 3
+            for mm in _CUIT_RE.finditer(l.texto):
+                c = "".join(mm.groups())
+                if c != cfg.cuit_rua and cuit_valido(c) and c[:2] in ("20", "23", "24", "27", "30", "33", "34") and c not in cuits:
+                    cuits.append(c)
+                    puntaje[c] = (not (etiqueta and arriba), not etiqueta, not arriba, orden)
+        e.cuit = min(cuits, key=lambda c: puntaje[c]) if cuits else ""
+        if len(cuits) > 1:
+            e.notas.append(f"hay varios CUIT ({', '.join(cuits)}); tomé {e.cuit} como el del proveedor")
         e.cuit_receptor = cfg.cuit_rua if re.search(r"30-?71741942-?8", texto) else ""
         e.condicion_receptor = _buscar(r"(?i)I\.?V\.?A\.?:\s*(Responsable Inscripto|Consumidor Final|Exento|Monotributo)", texto)
         cae = bool(re.search(r"(?i)\bC\.?A\.?E\.?\b", texto))
@@ -135,7 +144,9 @@ class Generico(Parser):
             v = montos_de_label(pat)
             return v[0] if v else None
         e.total = monto_linea(r"^(importe\s+)?total\b(?!\s*por)")
-        e.neto = monto_linea(r"^(importe\s+)?neto(\s+gravado)?\b")
+        e.neto = monto_linea(r"^(importe\s+)?neto(\s+gravado)?\b(?!\s*no\b)")
+        sin_iva = [v for v in montos_de_label(r"^(importe\s+)?(neto\s+no\s+gravado|no\s+gravado|exento)\b") if v]
+        e.no_gravado = sum(sin_iva, Decimal(0)) if sin_iva else None
         ivas = montos_de_label(r"^(importe\s+)?i\.?\s?v\.?\s?a\b")
         e.iva = sum((v for v in ivas if v is not None), Decimal(0)) if ivas else None
         if e.total is None:

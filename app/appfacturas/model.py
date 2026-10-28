@@ -61,7 +61,7 @@ class Extraccion:
     cuit: str = ""
     cod_comprobante: int | None = None
     letra: str = ""
-    tipo: str = "Factura"            # Factura / Nota de Crédito / Nota de Débito
+    tipo: str = "Factura"            # Factura / Nota de Crédito / Nota de Débito / Recibo / Nota de Venta
     pv: int | None = None
     nro: int | None = None
     razon_social: str = ""
@@ -77,6 +77,7 @@ class Extraccion:
     iva: Decimal | None = None
     total: Decimal | None = None
     otros_tributos: Decimal | None = None
+    no_gravado: Decimal | None = None    # "Importe Neto No Gravado" + "Importe Exento": paid, without IVA
     items: list[Item] = field(default_factory=list)
     fiscal: bool = True              # False = no CUIT/CAE (e.g. "FAC0297" receipts)
     numero_txt: str = ""             # number of a non-fiscal receipt ("FAC0297")

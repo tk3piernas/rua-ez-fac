@@ -19,7 +19,13 @@ def clave_nf(prov: str, tipo: str, numero: str) -> str:
 
 
 def _tipo_nombre(t: str) -> str:
-    return "Nota de Crédito" if t.startswith("Nota de Cr") else "Nota de Débito" if t.startswith("Nota de D") else "Factura"
+    if t.startswith("Nota de Cr"):
+        return "Nota de Crédito"
+    if t.startswith("Nota de D"):
+        return "Nota de Débito"
+    if t.startswith("Nota de V"):
+        return "Nota de Venta"
+    return "Recibo" if t == "Recibo" else "Factura"
 
 
 class Indice:
@@ -52,10 +58,10 @@ class Indice:
             cu, cod, pv, nro = afip
             return clave(cu, tipo_de_codigo(cod)[1], pv, nro)
         cu = self.cuit_por_carpeta.get(f.parent.name.lower())
-        m = re.match(r"^(Factura|Nota de Cr\S+|Nota de D\S+) (\d{4,5})-(\d{8})", f.stem)
+        m = re.match(r"^(Factura|Recibo|Nota de Venta|Nota de Cr\S+|Nota de D\S+) (\d{4,5})-(\d{8})", f.stem)
         if m and cu:
             return clave(cu, _tipo_nombre(m.group(1)), m.group(2), m.group(3))
-        m = re.match(r"^(Factura|Nota de Cr\S+|Nota de D\S+) ([A-Za-z]{1,5}-?\d{1,10})(?: \(\d+\))?$", f.stem)
+        m = re.match(r"^(Factura|Recibo|Nota de Venta|Nota de Cr\S+|Nota de D\S+) ([A-Za-z]{1,5}-?\d{1,10})(?: \(\d+\))?$", f.stem)
         if m and cu:
             return clave_nf(cu, _tipo_nombre(m.group(1)), m.group(2))
         return None

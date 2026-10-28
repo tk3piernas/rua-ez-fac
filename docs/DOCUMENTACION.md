@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.9.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.9.2 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -87,12 +87,12 @@ Estructura de la carpeta de la app:
    - Secciones de lo que no se carga, los proveedores nuevos y los archivos que se mueven.
    - Botones Confirmar y Copiar al portapapeles.
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
-4. **Historial:** los lotes anteriores y la opción de deshacer el último confirmado.
+4. **Historial:** los lotes anteriores, con la columna **Dónde** (PRUEBA o REAL) y el estado. Un lote que quedó "en curso" porque se cerró la app a mitad aparece como **quedó a medias**. Para el último lote: **Terminar este lote** (si quedó a medias o con cosas pendientes) y **Deshacer**, que dice sobre qué planilla actúa.
 5. **Proveedores** (`maestro.py`): memoria de datos de proveedores en `PROVEEDORES RUA.xlsx`.
    - Cuadro para pegar texto (mail, WhatsApp, .txt): lo lee el mismo lector de los .txt y arma una ficha editable con chequeos (dígito verificador de CUIT y CBU, banco del CBU). Si el proveedor ya está, muestra qué cambia.
    - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita la escritura real habilitada o la carpeta de prueba.
    - Al leer un lote, los proveedores que no están en la hoja Proveedores de la planilla toman sus datos de la memoria. Al confirmar, los datos de los .txt (y lo que se sacó de las facturas, solo para completar vacíos) se guardan en la memoria; deshacer el lote los vuelve atrás.
-   - Historial de cambios en `datos\memoria_proveedores.json` (los de cada lote, en la carpeta del lote). Botón para deshacer el último cambio: solo vuelve atrás filas que nadie tocó después; si la app había creado el archivo y queda vacío, lo borra.
+   - Historial de cambios en `datos\memoria_proveedores.json` (los de cada lote, en la carpeta del lote). El botón para deshacer el último cambio mira los dos historiales y dice de dónde vino el cambio (pegado a mano o un lote). Trabaja sobre el archivo que quedó anotado, aunque la app esté ahora en el otro modo (prueba o real). Solo vuelve atrás filas que nadie tocó después; si la app había creado el archivo y queda vacío, lo borra.
 6. **Configuración:**
    - **Setup** (ver abajo): crea lo que falte y muestra el chequeo.
    - Carpeta de prueba sí o no, y rearmarla.
@@ -107,8 +107,8 @@ Estructura de la carpeta de la app:
 - Busca el OneDrive de RUA (`OneDriveCommercial` o `%USERPROFILE%\OneDrive - *`, prefiriendo el que dice Rua) y muestra **qué va a crear** antes de hacerlo. Nunca pisa nada que exista.
   - En la app: `datos\`, `datos\lotes`, `datos\backups`, `datos\entrada_ui`.
   - En el OneDrive: `Facturas pendientes` con `_Entrada\<área>` para cada área, `_Entrada\_Duplicados`, `_Entrada\_Procesados`, una carpeta por área, `_Script` y `_Script\proveedores.csv` (solo el encabezado `CUIT;Area;Proveedor;Carpeta`).
-  - Si no hay planilla, crea una **vacía** con la misma estructura: una hoja por área (B4 alícuota, B5 `=TODAY()`, resumen H4:I9, encabezados en la fila 11, filas 12–210 con las fórmulas de H e I, formato de fechas y montos, colores de vencido / vence pronto, lista desplegable de Empresa desde la hoja Listas, una columna por área), Proveedores (encabezados A–O en la fila 4) y Listas.
-  - Si la planilla existe pero le faltan hojas de área (por ejemplo una de antes de Persona y ServiciosYa), las agrega como copia vacía de la última hoja de área: mismo formato, fórmulas y resumen, título y lista de Empresa propios. Antes guarda dos respaldos (al lado de la planilla y en `datos\backups`). En la planilla real necesita la escritura real habilitada. Mientras falte la hoja, las facturas de esa área quedan frenadas con un aviso.
+  - Si no hay planilla, la puede crear **vacía**, pero solo si tildás aparte "Sí, crear una planilla nueva vacía" (si ya existe en la nube y OneDrive no la bajó todavía, una vacía genera una copia en conflicto). No lo ofrece si la carpeta del OneDrive está vacía o tiene archivos que todavía están solo en la nube. La planilla vacía tiene la misma estructura: una hoja por área (B4 alícuota, B5 `=TODAY()`, resumen H4:I9, encabezados en la fila 11, filas 12–210 con las fórmulas de H e I, formato de fechas y montos, colores de vencido / vence pronto, lista desplegable de Empresa desde la hoja Listas, una columna por área), Proveedores (encabezados A–O en la fila 4) y Listas.
+  - Si la planilla existe pero le faltan hojas de área (por ejemplo una de antes de Persona y ServiciosYa), las agrega como copia vacía de la última hoja de área: mismo formato, fórmulas y resumen, título y lista de Empresa propios. Antes guarda dos respaldos (en la carpeta `Respaldos`, al lado de la planilla, y en `datos\backups`). En la planilla real necesita la escritura real habilitada. Mientras falte la hoja, las facturas de esa área quedan frenadas con un aviso.
 - Después muestra el **chequeo** (lo mismo que `appfacturas verificar`): librerías, carpetas, `proveedores.csv`, planilla y hojas, link de SharePoint, Excel y Edge, con OK / FALTA.
 - Si no encuentra el OneDrive de RUA sincronizado, no crea nada en la nube y lo avisa.
 
@@ -121,7 +121,8 @@ Estructura de la carpeta de la app:
   - Vuelve a poner la fórmula de H, tomada de una fila que la conserve (o `=IF(G="","",ROUND(G*$B$4,2))`).
   - La columna I no se toca. El encabezado, el resumen, el formato y las listas quedan.
   - Opcional: vaciar también Proveedores A5:O300.
-- Antes guarda dos respaldos: `DEUDA A PAGAR ARG - respaldo antes del reset <fecha>.xlsx` al lado de la planilla, y otra copia en `datos\backups`.
+- Antes guarda dos respaldos: `Respaldos\DEUDA A PAGAR ARG - respaldo antes del reset <fecha>.xlsx` al lado de la planilla, y otra copia en `datos\backups`.
+- **Volver al respaldo del reset:** mientras nadie haya cambiado la planilla desde el reset (se compara el SHA256 guardado en `datos\ultimo_reset.json`), aparece este botón al lado del Reset. Copia el respaldo encima del mismo archivo (los links compartidos siguen andando). La planilla tiene que estar cerrada en Excel. Se puede hacer una sola vez.
 - Si la planilla está abierta con cambios sin guardar, no hace nada.
 - Después de un reset, deshacer un lote anterior ya no borra filas de la planilla (no las encuentra), pero sí devuelve los archivos.
 
@@ -166,16 +167,24 @@ Estructura de la carpeta de la app:
 - **Columna J:** `=HYPERLINK("url","Factura 0002-00000189")`.
 - **Posible duplicado:** A:J en amarillo (color 13431551) y un comentario en A.
 - **Si la planilla tiene cambios sin guardar:** no escribe y las filas quedan pendientes. Se pueden reintentar o copiar al portapapeles.
-- **Antes de escribir:** hace un respaldo en `datos\backups\`. Cada paso se anota en el diario antes de escribir; si algo falla a mitad, revierte y no guarda.
+- **Antes de escribir:** hace un respaldo en `datos\backups\` (se guardan los últimos 20). Cada paso se anota en el diario antes de escribir; si algo falla a mitad, revierte y no guarda.
 
 ## Confirmar y deshacer, de a uno
 
 - Mientras corre una confirmación, un deshacer o un reintento, esos botones quedan deshabilitados.
 - `Ejecutor.ejecutar` no confirma un lote que ya tiene estado (en curso, confirmado o deshecho), y ni confirmar ni deshacer corren dos veces a la vez sobre el mismo lote. Antes, un doble clic duplicaba las filas.
 
+## Lotes cortados a medias y archivos que no se movieron
+
+- `lote_confirmado.json` se escribe **antes** de mover nada (el plan ya es final), y otra vez al terminar.
+- Si un archivo no se pudo mover (por ejemplo OneDrive lo tenía tomado), las filas de esa factura **no** se escriben, para que nunca haya un link a un archivo que sigue en `_Entrada`. En Resultado aparece cuántas quedaron y el botón **Reintentar archivos**.
+- **Terminar este lote / Reintentar** (`ejecutor.continuar`): hace solo los pasos de archivos que no están en el diario y después escribe solo las filas que todavía no se guardaron en la planilla. Se puede repetir sin duplicar nada. Sirve también para un lote que quedó a medias.
+- `estado.json` guarda `modo` (prueba / real), `base` y `planilla`. Para los lotes viejos, Historial lo deduce de la ruta de la planilla en el diario.
+
 ## Deshacer (ejecutor.py)
 
-- Deshace el último lote confirmado, recorriendo el diario al revés: primero Excel, después los archivos.
+- Deshace el último lote confirmado (o el que quedó a medias), recorriendo el diario al revés: primero Excel, después los archivos.
+- Si la parte de la memoria de proveedores no se pudo deshacer (por ejemplo `PROVEEDORES RUA.xlsx` abierta con cambios sin guardar), el lote queda deshecho pero con esa parte pendiente: tocar Deshacer de nuevo reintenta solo eso.
 - Solo toca:
   - filas que siguen como las dejó la app (compara A y J);
   - archivos con el mismo SHA256 que tenían al moverlos.
@@ -187,7 +196,7 @@ Estructura de la carpeta de la app:
 
 ## Pruebas
 
-- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
+- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, archivos que no se movieron, memoria y reset que se deshacen, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
 - `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
 - Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Las dos usan openpyxl y tardan segundos. La prueba que abre Excel de verdad (COM) corre solo si se pide: `python -m pytest -q -m excel app\tests_privados` (un minuto y medio).
 - También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).

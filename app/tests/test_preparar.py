@@ -1,4 +1,7 @@
 """Setup and workbook reset (no real invoices needed: this file also goes to the repo)."""
+from pathlib import Path
+
+import pytest
 from openpyxl import load_workbook
 from openpyxl.comments import Comment
 from openpyxl.styles import PatternFill
@@ -18,8 +21,11 @@ def test_setup_crea_todo_y_no_pisa(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
     cfg.base.parent.mkdir(parents=True)
     plan = preparar.plan_setup(cfg)
-    assert cfg.planilla in plan["archivos"] and cfg.base in plan["dirs"]
-    hecho = preparar.ejecutar_setup(cfg, plan)
+    assert plan["planilla_nueva"] == cfg.planilla and cfg.planilla not in plan["archivos"] and cfg.base in plan["dirs"]
+    assert plan["onedrive_sin_bajar"]                      # empty OneDrive folder: may still be syncing
+    preparar.ejecutar_setup(cfg, plan)
+    assert not cfg.planilla.exists()                       # A9: never without its own confirmation
+    hecho = preparar.ejecutar_setup(cfg, plan, crear_planilla=True)
     assert hecho
     for s in preparar.SUBCARPETAS:
         assert (cfg.base / s).is_dir()
@@ -117,3 +123,53 @@ def test_deshacer_dos_veces_no_toca_nada(tmp_path):
     with pytest.raises(ejecutor.YaDeshecho):
         ejecutor.deshacer(lote, log=lambda s: None)
     assert json.loads((lote / "estado.json").read_text(encoding="utf-8"))["problemas_deshacer"] == []
+
+
+def test_onedrive_sin_bajar(tmp_path):
+    assert preparar.onedrive_sin_bajar(tmp_path / "no existe")
+    assert preparar.onedrive_sin_bajar(tmp_path) == "la carpeta del OneDrive está vacía"
+    (tmp_path / "otro archivo.docx").write_bytes(b"x")
+    assert preparar.onedrive_sin_bajar(tmp_path) == ""
+
+
+def test_volver_del_reset(tmp_path):
+    """A10: the reset can be undone while nobody changed the workbook; the same file is written in place."""
+    cfg = _cfg(tmp_path)
+    preparar.crear_planilla_vacia(cfg.planilla)
+    wb = load_workbook(cfg.planilla)
+    wb["Vehicular"]["A12"], wb["Vehicular"]["G12"] = "Remolques X", 1000
+    wb.save(cfg.planilla)
+    backups = tmp_path / "datos" / "backups"
+    res = preparar.reset_planilla(cfg, backups, log=lambda s: None)
+    assert Path(res["respaldos"][0]).parent == cfg.planilla.parent / "Respaldos"     # A12
+    assert preparar.reset_para_volver(cfg, backups)
+    preparar.volver_del_reset(cfg, backups, log=lambda s: None)
+    assert load_workbook(cfg.planilla)["Vehicular"]["A12"].value == "Remolques X"
+    assert preparar.reset_para_volver(cfg, backups) is None                          # only once
+
+
+def test_no_vuelve_si_la_planilla_cambio_despues(tmp_path):
+    cfg = _cfg(tmp_path)
+    preparar.crear_planilla_vacia(cfg.planilla)
+    backups = tmp_path / "datos" / "backups"
+    preparar.reset_planilla(cfg, backups, log=lambda s: None)
+    wb = load_workbook(cfg.planilla)
+    wb["Vehicular"]["A12"] = "cargada después del reset"
+    wb.save(cfg.planilla)
+    assert preparar.reset_para_volver(cfg, backups) is None
+    with pytest.raises(preparar.ExcelError):
+        preparar.volver_del_reset(cfg, backups)
+
+
+def test_respaldos_locales_quedan_20(tmp_path):
+    """A12: datos\backups keeps only the newest 20 copies."""
+    from appfacturas import excel
+    backups = tmp_path / "backups"
+    backups.mkdir()
+    for i in range(25):
+        (backups / f"2026-01-{i + 1:02d}_000000 DEUDA A PAGAR ARG.xlsx").write_bytes(b"x")
+    pl = tmp_path / "DEUDA A PAGAR ARG.xlsx"
+    pl.write_bytes(b"y")
+    excel.respaldar(pl, backups)
+    quedan = sorted(p.name for p in backups.glob("*.xlsx"))
+    assert len(quedan) == 20 and quedan[0].startswith("2026-01-07")

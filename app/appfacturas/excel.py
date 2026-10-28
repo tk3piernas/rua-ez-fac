@@ -395,11 +395,28 @@ def _hyperlink(url: str, texto: str) -> str:
     return f'=HYPERLINK("{q(url)}","{q(texto)}")'
 
 
-def respaldar(ruta: Path, carpeta: Path) -> Path:
+RESPALDOS_A_GUARDAR = 20
+
+
+def respaldar(ruta: Path, carpeta: Path, motivo: str = "") -> Path:
+    """Copy of the workbook in `carpeta` (datos\\backups); only the newest RESPALDOS_A_GUARDAR are kept."""
     carpeta.mkdir(parents=True, exist_ok=True)
-    dest = carpeta / f"{datetime.now():%Y-%m-%d_%H%M%S} {ruta.name}"
+    dest = carpeta / f"{datetime.now():%Y-%m-%d_%H%M%S} {motivo + ' ' if motivo else ''}{ruta.name}"
     shutil.copy2(ruta, dest)
+    podar_respaldos(carpeta)
     return dest
+
+
+def podar_respaldos(carpeta: Path, quedan: int = RESPALDOS_A_GUARDAR) -> list[Path]:
+    """Deletes the oldest workbook copies (their names start with the date) beyond `quedan`."""
+    copias = sorted(carpeta.glob("*.xlsx"), key=lambda p: p.name)
+    viejas = copias[:-quedan] if len(copias) > quedan else []
+    for v in viejas:
+        try:
+            v.unlink()
+        except OSError:
+            pass
+    return viejas
 
 
 def escribir(cfg, lote, diario, backups: Path, guardar_cambios_usuario: bool = False, log=print) -> dict:

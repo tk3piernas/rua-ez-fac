@@ -535,7 +535,8 @@ async def confirmar(tabs, t_res):
         return
     n = ui.notification("Cargando…", spinner=True, timeout=None)
     try:
-        S.resultado = await run.io_bound(lambda: ejecutor.Ejecutor(cfg, lote, S.trabajo, log=lambda s: None).ejecutar())
+        S.resultado = await run.io_bound(lambda: ejecutor.Ejecutor(cfg, lote, S.trabajo, log=lambda s: None,
+                                                                    modo="prueba" if S.usar_prueba else "real").ejecutar())
     except ejecutor.YaConfirmado as ex:
         ui.notify(f"No hice nada: {ex}.", type="info")
         return
@@ -554,6 +555,38 @@ async def confirmar(tabs, t_res):
     panel_resultado.refresh()
     panel_historial.refresh()
     tabs.set_value(t_res)
+
+
+@de_a_uno
+async def continuar(trabajo: Path, con_archivos: bool = True):
+    pagina_ = ui.context.client.layout
+    n = ui.notification("Terminando el lote…", spinner=True, timeout=None)
+    try:
+        r = await run.io_bound(lambda: ejecutor.continuar(S.cfg, trabajo, log=lambda s: None, con_archivos=con_archivos))
+    except Exception as ex:
+        with pagina_:
+            ui.notify(f"No pude seguir: {ex}", type="negative", multi_line=True)
+        return
+    finally:
+        n.dismiss()
+    est = ejecutor.estado(trabajo)
+    with pagina_:
+        if not est.get("archivos_pendientes") and r["excel"] in ("escrito", "no corresponde"):
+            ui.notify("Listo: el lote quedó completo.", type="positive")
+        else:
+            ui.notify("Todavía quedan cosas pendientes: " + "; ".join(r["errores"] + ([r["excel_mensaje"]] if r["excel_mensaje"] else [])),
+                      type="warning", multi_line=True, timeout=0, close_button=True)
+    if S.trabajo == trabajo and S.resultado:
+        S.resultado.update({k: r[k] for k in ("excel", "excel_mensaje", "errores", "sin_archivo")})
+        S.resultado["hechos"] = S.resultado.get("hechos", []) + r["hechos"]
+    panel_resultado.refresh()
+    panel_historial.refresh()
+
+
+def texto_donde(trabajo: Path) -> str:
+    modo, planilla = ejecutor.donde(trabajo)
+    lugar = {"prueba": "la COPIA de prueba", "real": "la planilla REAL"}.get(modo, "la planilla")
+    return f"{lugar}{f' ({planilla})' if planilla else ''}"
 
 
 # ------------------------------------------------------------------ Resultado
@@ -580,12 +613,19 @@ def panel_resultado():
                 "text-center " + ("text-green-700" if r["excel"] == "escrito" else "text-amber-700"))
             for e in r["errores"]:
                 ui.label("! " + e).classes("text-red-700 text-sm")
+            if est.get("archivos_pendientes"):
+                ui.label(f"{est.get('filas_sin_archivo', 0)} filas no se escribieron porque su archivo no se movió "
+                         f"(sigue en _Entrada). Tocá 'Reintentar archivos' cuando el archivo esté libre.").classes(
+                    "text-amber-700 text-sm text-center")
         with seccion("Qué se hizo", "list", "w-[760px]"):
             with ui.expansion("Ver el detalle", icon="list").classes("w-full"):
                 for h in r["hechos"]:
                     ui.label("• " + h).classes("text-sm")
         with seccion("Acciones", "build", "w-[760px]"):
             with ui.row().classes("justify-center gap-4"):
+                if est.get("archivos_pendientes"):
+                    mientras_libre(ui.button("Reintentar archivos", icon="drive_file_move",
+                                             on_click=lambda: continuar(S.trabajo)))
                 if est.get("excel") == "pendiente":
                     @de_a_uno
                     async def reintentar():
@@ -604,8 +644,9 @@ def panel_resultado():
 async def deshacer(trabajo: Path):
     with ui.dialog() as dlg, ui.card().classes("items-center"):
         ui.label(f"¿Deshago el lote {trabajo.name}?").classes("font-bold")
-        ui.label("Borra las filas que agregó en la planilla y devuelve los archivos a donde estaban "
-                 "(solo lo que sigue igual a como lo dejó la app).").classes("text-center")
+        escritas = ejecutor.estado(trabajo).get("excel") == "escrito"
+        ui.label(("Borra las filas que agregó en " + texto_donde(trabajo) + " y devuelve" if escritas else "Devuelve")
+                 + " los archivos a donde estaban (solo lo que sigue igual a como lo dejó la app).").classes("text-center")
         with ui.row().classes("justify-center"):
             ui.button("Sí, deshacer", on_click=lambda: dlg.submit(True)).props("color=negative")
             ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
@@ -647,16 +688,25 @@ def panel_historial():
         filas = []
         for x in lotes[:40]:
             e = ejecutor.estado(x)
-            filas.append({"lote": x.name, "estado": e.get("estado", "solo leído / simulado"),
+            modo = ejecutor.donde(x)[0] if e.get("estado") else ""
+            filas.append({"lote": x.name, "estado": ejecutor.etiqueta(x), "donde": modo.upper(),
                           "planilla": e.get("excel", ""), "errores": len(e.get("errores", []))})
         ui.aggrid({"columnDefs": [{"field": "lote", "headerName": "Lote", "width": 180},
-                                  {"field": "estado", "headerName": "Estado", "width": 220},
+                                  {"field": "estado", "headerName": "Estado", "width": 200},
+                                  {"field": "donde", "headerName": "Dónde", "width": 100},
                                   {"field": "planilla", "headerName": "Planilla", "width": 150},
                                   {"field": "errores", "headerName": "Errores", "width": 100}],
                    "autoSizeStrategy": {"type": "fitGridWidth"}, "rowData": filas}, theme="balham").classes("w-full").style(f"height: {min(600, 64 + 28 * len(filas))}px")
         if ultimo:
-            mientras_libre(ui.button(f"Deshacer el último lote confirmado ({ultimo.name})", icon="undo",
-                                     on_click=lambda: deshacer(ultimo)).props("color=negative outline"))
+            e = ejecutor.estado(ultimo)
+            ui.label(f"Último lote: {ultimo.name} ({ejecutor.etiqueta(ultimo)}), cargado en {texto_donde(ultimo)}").classes(
+                "text-sm text-gray-600 text-center break-all")
+            with ui.row().classes("justify-center gap-4"):
+                if ejecutor.etiqueta(ultimo) == "quedó a medias" or e.get("archivos_pendientes") or e.get("excel") == "pendiente":
+                    mientras_libre(ui.button("Terminar este lote", icon="play_arrow",
+                                             on_click=lambda: continuar(ultimo)).props("outline"))
+                mientras_libre(ui.button(f"Deshacer el último lote ({ultimo.name}, {ejecutor.donde(ultimo)[0].upper() or '?'})",
+                                         icon="undo", on_click=lambda: deshacer(ultimo)).props("color=negative outline"))
 
 
 # ------------------------------------------------------------------ open / export the workbook
@@ -729,6 +779,11 @@ def hist_memoria() -> Path:
     return datos() / "memoria_proveedores.json"
 
 
+def historiales_memoria() -> list[Path]:
+    """Pasted by hand, plus one per batch (datos\\lotes\\<id>\\memoria_proveedores.json)."""
+    return [hist_memoria()] + sorted((datos() / "lotes").glob(f"*/{ejecutor.HIST_MEMORIA}"))
+
+
 def panel_proveedores():
     """Paste a provider's details, check them and keep them in PROVEEDORES RUA.xlsx (the provider memory)."""
     from . import maestro
@@ -762,9 +817,14 @@ def panel_proveedores():
         ficha.refresh()
         memoria.refresh()
 
+    @de_a_uno
     async def deshacer_memoria():
+        u = maestro.ultimo_de(historiales_memoria())
+        if not u:
+            ui.notify("No hay cambios para deshacer", type="info")
+            return
         try:
-            problemas = await run.io_bound(maestro.deshacer, S.cfg, hist_memoria())
+            problemas = await run.io_bound(lambda: maestro.deshacer(S.cfg, u[0], id_=u[1]["id"]))
         except Exception as ex:
             ui.notify(f"No pude deshacer: {ex}", type="negative", multi_line=True)
             return
@@ -848,10 +908,12 @@ def panel_proveedores():
                     import os
                     ui.button("Abrir la planilla de proveedores", icon="open_in_new",
                               on_click=lambda: os.startfile(r)).props("outline")
-                u = maestro.ultimo(hist_memoria())
+                u = maestro.ultimo_de(historiales_memoria())
                 if u:
-                    ui.button(f"Deshacer el último cambio ({u['fecha'].replace('T', ' ')[:16]})", icon="undo",
-                              on_click=deshacer_memoria).props("color=negative outline")
+                    e = u[1]
+                    mientras_libre(ui.button(f"Deshacer el último cambio ({e['motivo']}, {e['fecha'].replace('T', ' ')[:16]}, "
+                                             f"en {Path(e['ruta']).parent.name})", icon="undo",
+                                             on_click=deshacer_memoria).props("color=negative outline"))
     memoria()
 
 
@@ -903,8 +965,10 @@ def panel_config(refrescar_modo):
                      "Vuelve a poner la fórmula del IVA en H, no toca la columna I ni el formato, y es el mismo "
                      "archivo (los links compartidos siguen andando). Antes guarda dos copias de respaldo.").classes(
                 "text-sm text-gray-600 text-center")
-            ui.button("Reset de la planilla…", icon="delete_forever", on_click=dialogo_reset).props(
-                "color=negative outline")
+            with ui.row().classes("justify-center gap-3"):
+                ui.button("Reset de la planilla…", icon="delete_forever", on_click=dialogo_reset).props(
+                    "color=negative outline")
+                volver_reset_boton()
 
         with seccion("Cómo se carga", "tune", "w-[760px]"):
             def cambiar_filas(e):
@@ -937,9 +1001,13 @@ def mostrar_chequeo(lineas: list[str]) -> None:
                 ui.label(l).classes("text-sm font-bold" if l.startswith(("Todo", "Hay")) else "text-xs text-gray-500")
 
 
+F_setup = {"nueva": False}
+
+
 async def dialogo_setup():
     from . import instalacion, preparar
     cfg_real = config.cargar()
+    F_setup["nueva"] = False
     plan = await run.io_bound(preparar.plan_setup, cfg_real)
     ok, lineas = await run.io_bound(instalacion.chequeo)
     with ui.dialog() as dlg, ui.card().classes("seccion w-[760px] max-w-full gap-3 p-6"):
@@ -951,6 +1019,17 @@ async def dialogo_setup():
                 ui.label("No encuentro el OneDrive de RUA sincronizado en esta PC (carpeta 'OneDrive - Rua Asistencia'). "
                          "Abrí OneDrive, iniciá sesión con tu cuenta de RUA y volvé a tocar Setup.").classes("text-red-700 text-sm")
             pend = plan["dirs"] + plan["archivos"] + plan["hojas"]
+            if plan.get("planilla_nueva"):
+                with ui.card().classes("w-full bg-amber-50 gap-1"):
+                    ui.label(f"No encuentro la planilla: {plan['planilla_nueva']}").classes("font-bold text-sm break-all")
+                    if plan.get("onedrive_sin_bajar"):
+                        ui.label(f"No la creo: {plan['onedrive_sin_bajar']}. Si la planilla ya existe en la nube, "
+                                 "esperá a que OneDrive termine de sincronizar y volvé a tocar Setup.").classes(
+                            "text-sm text-amber-800")
+                    else:
+                        ui.label("Si ya existe en la nube, esperá a que OneDrive termine de sincronizar: si creo una "
+                                 "vacía ahora, OneDrive va a hacer una copia en conflicto.").classes("text-sm text-amber-800")
+                        ui.checkbox("Sí, crear una planilla nueva vacía").bind_value(F_setup, "nueva")
             if pend:
                 ui.label(f"Voy a crear {len(pend)} cosas:").classes("font-bold")
                 with ui.column().classes("gap-0 w-full"):
@@ -972,7 +1051,8 @@ async def dialogo_setup():
                           "(Configuración). Ahora creo solo las carpetas y archivos.", type="warning", multi_line=True)
                 plan = {**plan, "hojas": []}
             try:
-                hecho = await run.io_bound(preparar.ejecutar_setup, cfg_real, plan)
+                hecho = await run.io_bound(preparar.ejecutar_setup, cfg_real, plan,
+                                           bool(F_setup["nueva"] and not plan.get("onedrive_sin_bajar")))
             except Exception as ex:
                 ui.notify(f"No pude crear todo: {ex}", type="negative", multi_line=True)
                 return
@@ -981,13 +1061,43 @@ async def dialogo_setup():
             ok, lineas = await run.io_bound(instalacion.chequeo)
             S.cfg = cfg_activa()
             cuerpo.refresh()
-            btn.set_visibility(bool(plan["dirs"] or plan["archivos"] or plan["hojas"]))
+            btn.set_visibility(bool(plan["dirs"] or plan["archivos"] or plan["hojas"] or plan.get("planilla_nueva")))
 
         with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
             btn = ui.button("Crear lo que falta", icon="add_circle", on_click=crear).props("color=secondary unelevated")
-            btn.set_visibility(bool(plan["dirs"] or plan["archivos"] or plan["hojas"]))
+            btn.set_visibility(bool(plan["dirs"] or plan["archivos"] or plan["hojas"] or plan.get("planilla_nueva")))
             ui.button("Cerrar", on_click=dlg.close).props("flat")
     dlg.open()
+
+
+@ui.refreshable
+def volver_reset_boton():
+    from . import preparar
+    r = preparar.reset_para_volver(S.cfg, datos() / "backups") if S.cfg else None
+    if r:
+        mientras_libre(ui.button(f"Volver al respaldo del reset ({r['fecha'].replace('T', ' ')[:16]})", icon="undo",
+                                 on_click=volver_reset).props("outline"))
+
+
+@de_a_uno
+async def volver_reset():
+    from . import preparar
+    with ui.dialog() as dlg, ui.card().classes("items-center"):
+        ui.label("¿Vuelvo la planilla a como estaba antes del reset?").classes("font-bold")
+        ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {S.cfg.planilla}").classes("text-xs break-all")
+        ui.label("Nadie la cambió desde el reset. Tiene que estar cerrada en Excel.").classes("text-sm text-center")
+        with ui.row().classes("justify-center"):
+            ui.button("Sí, volver", on_click=lambda: dlg.submit(True)).props("color=negative")
+            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+    if not await dlg:
+        return
+    try:
+        await run.io_bound(preparar.volver_del_reset, S.cfg, datos() / "backups", lambda s: None)
+    except Exception as ex:
+        ui.notify(f"No pude volver (no se cambió nada): {ex}", type="negative", multi_line=True)
+        return
+    ui.notify("La planilla volvió a como estaba antes del reset.", type="positive")
+    volver_reset_boton.refresh()
 
 
 async def dialogo_reset():
@@ -1001,8 +1111,9 @@ async def dialogo_reset():
         ui.label("Reset de la planilla").classes("titulo-seccion")
         ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {cfg.planilla}").classes(
             "text-xs text-center break-all " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
-        ui.label(f"Se vacían las filas cargadas de {', '.join(config.AREAS[:-1])} y {config.AREAS[-1]}. Antes se guardan dos copias: una al lado de la "
-                 "planilla y otra en datos\\backups.").classes("text-sm text-center")
+        ui.label(f"Se vacían las filas cargadas de {', '.join(config.AREAS[:-1])} y {config.AREAS[-1]}. Antes se guardan dos copias: una en "
+                 "la carpeta Respaldos, al lado de la planilla, y otra en datos\\backups. Mientras nadie toque la "
+                 "planilla, se puede volver atrás desde Configuración.").classes("text-sm text-center")
         provs = ui.checkbox("También vaciar la hoja Proveedores")
         conf = ui.input("Escribí BORRAR para confirmar").classes("w-64")
         with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
@@ -1026,6 +1137,7 @@ async def dialogo_reset():
               + f". Respaldo: {res['respaldos'][0]}", type="positive", multi_line=True, timeout=0, close_button=True)
     S.lote = None
     panel_revision.refresh()
+    volver_reset_boton.refresh()
 
 
 # ------------------------------------------------------------------ start

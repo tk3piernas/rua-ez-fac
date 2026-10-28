@@ -81,3 +81,32 @@ def test_deshacer_respeta_cambios_posteriores(tmp_path):
     problemas = maestro.deshacer(cfg, hist, log=lambda s: None)
     assert problemas and "cambió después" in problemas[0]
     assert maestro.leer(cfg)[CUIT]["valores"][5] == "lo cambió una persona"
+
+
+def test_deshacer_con_la_app_en_otro_modo(tmp_path):
+    """A8: saved in one mode (test folder), undone with the app in the other one: it works on the saved file."""
+    cfg = _cfg(tmp_path / "prueba")
+    maestro.crear(maestro.ruta(cfg))
+    hist = tmp_path / "hist.json"
+    vals, _ = maestro.desde_texto(TEXTO)
+    maestro.guardar(cfg, [(vals, False)], hist, "test", log=lambda s: None)
+    otro_modo = _cfg(tmp_path / "real")
+    assert maestro.deshacer(otro_modo, hist, log=lambda s: None) == []
+    assert maestro.leer(cfg) == {}
+
+
+def test_ultimo_cambio_entre_varios_historiales(tmp_path):
+    """A8: the Proveedores undo button sees the newest change, pasted by hand or from a batch."""
+    cfg = _cfg(tmp_path)
+    maestro.crear(maestro.ruta(cfg))
+    a_mano, de_lote = tmp_path / "a_mano.json", tmp_path / "lotes" / "L1" / "memoria_proveedores.json"
+    vals, _ = maestro.desde_texto(TEXTO)
+    maestro.guardar(cfg, [(vals, False)], a_mano, "pegado a mano", log=lambda s: None)
+    otro = list(vals)
+    otro[5] = "Ana"
+    maestro.guardar(cfg, [(otro, False)], de_lote, "lote L1", log=lambda s: None)
+    h, e = maestro.ultimo_de([a_mano, de_lote])
+    assert h == de_lote and e["motivo"] == "lote L1"
+    assert maestro.deshacer(cfg, h, id_=e["id"], log=lambda s: None) == []
+    assert maestro.leer(cfg)[CUIT]["valores"][5] == ""
+    assert maestro.ultimo_de([a_mano, de_lote])[0] == a_mano

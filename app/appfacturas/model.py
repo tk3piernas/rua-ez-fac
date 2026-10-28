@@ -180,7 +180,7 @@ def a_json(o):
 
 
 def cargar_lote(ruta: Path) -> "Lote":
-    """Rebuild the parts of a saved batch needed to retry Excel (rows and provider rows)."""
+    """Rebuild the parts of a saved batch needed to retry it: rows, provider rows and the file plan."""
     import json
     from datetime import date as _d
     d = json.loads(Path(ruta).read_text(encoding="utf-8"))
@@ -191,4 +191,5 @@ def cargar_lote(ruta: Path) -> "Lote":
         lote.filas.append(Fila(**{**r, "fecha": fec(r.get("fecha")), "vto": fec(r.get("vto")),
                                   "monto": dec(r.get("monto")), "iva": dec(r.get("iva"))}))
     lote.proveedores = d.get("proveedores", [])
+    lote.plan = d.get("plan", [])
     return lote

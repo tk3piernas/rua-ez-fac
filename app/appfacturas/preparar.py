@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import config
-from .excel import PRIMERA, ULTIMA, ExcelError, abrir
+from .excel import PRIMERA, ULTIMA, ExcelError, abrir, respaldar
 from .maestro import COLS
 
 AREAS = config.AREAS
@@ -19,6 +19,7 @@ COL_LISTA = "ABCDEFGH"                                     # Listas column with 
 H_R1C1 = '=IF(RC[-1]="","",ROUND(RC[-1]*R4C2,2))'          # H = G * B4 (IVA)
 I_R1C1 = '=IF(RC[-2]="","",RC[-2]+RC[-1])'                 # I = G + H
 COLS_PROVEEDORES = COLS
+CARPETA_RESPALDOS = "Respaldos"                           # next to the workbook, in the OneDrive
 
 
 # ------------------------------------------------------------------ where things go
@@ -55,16 +56,42 @@ def plan_setup(cfg) -> dict:
         if not (base / "_Script" / "proveedores.csv").is_file():
             crear_archivos.append(base / "_Script" / "proveedores.csv")
     planilla = cfg.planilla or (raiz / NOMBRE_PLANILLA if raiz else None)
-    if planilla and not planilla.is_file():
-        crear_archivos.append(planilla)
+    # a missing workbook is asked apart: OneDrive may not have downloaded it yet (A9)
+    nueva = planilla if planilla and not planilla.is_file() else None
     hojas = hojas_faltantes(planilla) if planilla and planilla.is_file() else []
     return {"base": base, "raiz": raiz, "planilla": planilla, "dirs": crear_dirs, "archivos": crear_archivos,
-            "hojas": hojas, "sin_onedrive": base is None}
+            "hojas": hojas, "sin_onedrive": base is None, "planilla_nueva": nueva,
+            "onedrive_sin_bajar": onedrive_sin_bajar(planilla.parent if planilla else raiz) if nueva else ""}
 
 
-def ejecutar_setup(cfg, plan: dict | None = None) -> list[str]:
+def onedrive_sin_bajar(carpeta: Path | None) -> str:
+    """Why the OneDrive folder may still be syncing ("" if it looks complete): empty, or with files that are
+    only in the cloud. Then a missing workbook may just not be here yet."""
+    if not carpeta or not carpeta.is_dir():
+        return "la carpeta del OneDrive todavía no existe"
+    try:
+        hijos = list(carpeta.iterdir())
+    except OSError:
+        return "no puedo ver la carpeta del OneDrive"
+    if not hijos:
+        return "la carpeta del OneDrive está vacía"
+    SOLO_NUBE = 0x00400000 | 0x00040000 | 0x00001000   # RECALL_ON_DATA_ACCESS, RECALL_ON_OPEN, OFFLINE
+    for h in hijos:
+        try:
+            if getattr(h.stat(), "st_file_attributes", 0) & SOLO_NUBE:
+                return f"hay archivos que OneDrive todavía no bajó (por ejemplo {h.name})"
+        except OSError:
+            continue
+    return ""
+
+
+def ejecutar_setup(cfg, plan: dict | None = None, crear_planilla: bool = False) -> list[str]:
+    """Creates what the plan says. The empty workbook only with `crear_planilla` (its own confirmation)."""
     plan = plan or plan_setup(cfg)
     hecho = []
+    if crear_planilla and plan.get("planilla_nueva") and not plan["planilla_nueva"].exists():
+        crear_planilla_vacia(plan["planilla_nueva"])
+        hecho.append(f"Planilla nueva vacía: {plan['planilla_nueva']}")
     for d in plan["dirs"]:
         d.mkdir(parents=True, exist_ok=True)
         hecho.append(f"Carpeta creada: {d}")
@@ -227,13 +254,14 @@ def respaldo_reset(planilla: Path, backups: Path) -> list[Path]:
 
 
 def respaldo(planilla: Path, backups: Path, motivo: str) -> list[Path]:
-    """Two copies before a big change: next to the workbook (OneDrive keeps it) and in datos\\backups."""
+    """Two copies before a big change: in 'Respaldos' next to the workbook (OneDrive keeps it) and in
+    datos\\backups (only the newest 20 stay there)."""
     marca = f"{datetime.now():%Y-%m-%d %H%M}"
-    junto = planilla.with_name(f"{planilla.stem} - respaldo {motivo} {marca}{planilla.suffix}")
-    backups.mkdir(parents=True, exist_ok=True)
-    local = backups / f"{datetime.now():%Y-%m-%d_%H%M%S} {motivo} {planilla.name}"
+    carpeta = planilla.parent / CARPETA_RESPALDOS
+    carpeta.mkdir(exist_ok=True)
+    junto = carpeta / f"{planilla.stem} - respaldo {motivo} {marca}{planilla.suffix}"
     shutil.copy2(planilla, junto)
-    shutil.copy2(planilla, local)
+    local = respaldar(planilla, backups, motivo)
     return [junto, local]
 
 
@@ -263,9 +291,69 @@ def reset_planilla(cfg, backups: Path, vaciar_proveedores: bool = False, log=pri
             hp.limpiar("A5:O300")
             log(f"Proveedores: {provs} filas vaciadas")
         libro.guardar()
-        return {"filas": filas, "proveedores": provs, "respaldos": [str(c) for c in copias]}
     finally:
         libro.cerrar()
+    _anotar_reset(Path(cfg.planilla), backups, copias)
+    return {"filas": filas, "proveedores": provs, "respaldos": [str(c) for c in copias]}
+
+
+def _archivo_reset(backups: Path) -> Path:
+    return backups.parent / "ultimo_reset.json"
+
+
+def _anotar_reset(planilla: Path, backups: Path, copias: list[Path]) -> None:
+    import json
+    from .util import sha256
+    _archivo_reset(backups).write_text(json.dumps(
+        {"fecha": datetime.now().isoformat(timespec="seconds"), "planilla": str(planilla),
+         "respaldo": str(copias[0]), "respaldo_local": str(copias[1]),
+         "sha256": sha256(planilla), "deshecho": False}, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def reset_para_volver(cfg, backups: Path) -> dict | None:
+    """The last reset of this workbook, if it can still be undone: nobody changed the workbook since
+    (same SHA256) and its backup is still there."""
+    import json
+    from .util import sha256
+    try:
+        r = json.loads(_archivo_reset(backups).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    pl = Path(cfg.planilla) if cfg.planilla else None
+    if r.get("deshecho") or not pl or not pl.is_file() or str(pl).lower() != r["planilla"].lower():
+        return None
+    copia = next((Path(c) for c in (r["respaldo"], r.get("respaldo_local", "")) if c and Path(c).is_file()), None)
+    if not copia or sha256(pl) != r["sha256"]:
+        return None
+    return {**r, "copia": str(copia)}
+
+
+def volver_del_reset(cfg, backups: Path, log=print) -> Path:
+    """Puts back the workbook as it was before the last reset. Same file (written in place, so the OneDrive
+    sharing links keep working). Only if nobody changed it since the reset, and with the workbook closed."""
+    import json
+    r = reset_para_volver(cfg, backups)
+    if not r:
+        raise ExcelError("no hay un reset para deshacer (o la planilla cambió después del reset)")
+    pl = Path(cfg.planilla)
+    if _abierta_en_excel(cfg, pl):
+        raise ExcelError("la planilla está abierta en Excel: cerrala y volvé a probar")
+    shutil.copyfile(r["copia"], pl)
+    r["deshecho"] = True
+    r.pop("copia")
+    _archivo_reset(backups).write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
+    log(f"PLANILLA vuelve a como estaba antes del reset del {r['fecha']}")
+    return pl
+
+
+def _abierta_en_excel(cfg, pl: Path) -> bool:
+    if getattr(cfg, "excel_motor", "com") != "com":
+        return False
+    try:
+        from .excel import LibroCOM, url_onedrive_de
+        return LibroCOM._buscar_abierto(pl, url_onedrive_de(cfg, pl)) is not None
+    except Exception:
+        return False
 
 
 # ------------------------------------------------------------------ export

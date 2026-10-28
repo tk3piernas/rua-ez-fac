@@ -10,7 +10,7 @@ RUA EZ-Fac lee los PDF, zip y .txt que mandan los proveedores. Detecta duplicado
 - da de alta los proveedores nuevos;
 - escribe las filas en la planilla, esté abierta o cerrada.
 
-Las facturas que se frenan (en rojo en la grilla, por ejemplo una Factura A sin neto) se ven pero no se cargan, y el resto del lote sigue. Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
+Las facturas que se frenan (en rojo en la grilla, por ejemplo una Factura A sin neto) se ven pero no se cargan, y el resto del lote sigue. Cada lote se puede deshacer, también uno que quedó a medias porque se cerró la app; y si un archivo no se pudo mover, su fila no se escribe hasta que toques *Reintentar archivos*. Reemplaza al script `OrdenarFacturas.ps1`.
 
 - **Guía de uso (2 páginas):** [docs/Guia de uso RUA EZ-Fac.pdf](docs/Guia%20de%20uso%20RUA%20EZ-Fac.pdf)
 - **Documentación técnica:** [docs/DOCUMENTACION.md](docs/DOCUMENTACION.md)
@@ -50,7 +50,7 @@ Arriba a la derecha: **Abrir planilla** abre en Excel la planilla en la que est�
 
 ## Empezar la planilla de cero
 
-**Configuración → Reset de la planilla…** (hay que escribir BORRAR). Vacía las filas 12–210 de las hojas de cada área en el mismo archivo, así los links compartidos siguen andando: vuelve a poner la fórmula del IVA, no toca la columna I ni el formato, y si querés también vacía Proveedores. Antes guarda dos respaldos.
+**Configuración → Reset de la planilla…** (hay que escribir BORRAR). Vacía las filas 12–210 de las hojas de cada área en el mismo archivo, así los links compartidos siguen andando: vuelve a poner la fórmula del IVA, no toca la columna I ni el formato, y si querés también vacía Proveedores. Antes guarda dos respaldos (uno en la carpeta `Respaldos`, al lado de la planilla). Mientras nadie toque la planilla, **Volver al respaldo del reset** la deja como estaba.
 
 ## Actualizar
 

@@ -87,8 +87,9 @@ def _mover(de: Path, a: Path, intentos: int = 4) -> None:
 
 class Ejecutor:
     def __init__(self, cfg, lote: Lote, carpeta_lote: Path, log=print, con_excel: bool = True,
-                 guardar_cambios_usuario: bool = False):
+                 guardar_cambios_usuario: bool = False, modo: str = ""):
         self.cfg, self.lote, self.carpeta = cfg, lote, carpeta_lote
+        self.modo = modo                  # "prueba" / "real": shown in Historial
         self.con_excel = con_excel
         self.guardar_cambios_usuario = guardar_cambios_usuario
         self.diario = Diario(carpeta_lote)
@@ -120,8 +121,22 @@ class Ejecutor:
             return self._ejecutar()
 
     def _ejecutar(self) -> dict:
-        _guardar_estado(self.carpeta, estado="en curso", inicio=datetime.now().isoformat(timespec="seconds"))
-        pasos = sorted((p for p in self.lote.plan if p["op"] in ORDEN), key=lambda p: ORDEN[p["op"]])
+        self.carpeta.mkdir(parents=True, exist_ok=True)
+        _guardar_estado(self.carpeta, estado="en curso", inicio=datetime.now().isoformat(timespec="seconds"),
+                        modo=self.modo, base=str(self.cfg.base or ""), planilla=str(self.cfg.planilla or ""))
+        # the plan is final: saved before any step, so a batch cut halfway can still be undone and continued
+        self._guardar_lote()
+        self._pasos()
+        return self._terminar()
+
+    def _guardar_lote(self) -> None:
+        (self.carpeta / "lote_confirmado.json").write_text(
+            json.dumps(self.lote, default=_a_json, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    def _pasos(self) -> None:
+        """File steps of the plan that the journal does not have yet (all of them the first time)."""
+        pasos = sorted((p for p in self.lote.plan if p["op"] in ORDEN and not _hecho(p, self.diario.pasos)),
+                       key=lambda p: ORDEN[p["op"]])
         for p in pasos:
             try:
                 getattr(self, "_" + p["op"])(p)
@@ -130,22 +145,35 @@ class Ejecutor:
                 self.errores.append(msg)
                 self.diario.anotar({"op": "error", "paso": p, "error": str(ex)})
                 self.log(f"ERROR  {msg}")
-        excel_estado, excel_msg, excel_res = "no corresponde", "", {"filas": 0, "proveedores": 0}
-        if self.lote.filas or self.lote.proveedores:
+
+    def _terminar(self) -> dict:
+        """Rows (only those not written yet, and never those whose file did not move), memory and state."""
+        sin_archivo = _sin_archivo(self.lote, self.diario.pasos)
+        a_escribir = _sin_lo_escrito(self.lote, self.diario.pasos, sin_archivo)
+        ya_escrito = bool(_escritas(self.diario.pasos)[0])
+        excel_estado, excel_msg, excel_res = ("escrito" if ya_escrito else "no corresponde"), "", {"filas": 0, "proveedores": 0}
+        if a_escribir.filas or a_escribir.proveedores:
             if not self.con_excel:
                 excel_estado = "pendiente"
             else:
-                excel_estado, excel_msg, excel_res = escribir_excel(self.cfg, self.lote, self.diario, self.carpeta,
+                excel_estado, excel_msg, excel_res = escribir_excel(self.cfg, a_escribir, self.diario, self.carpeta,
                                                                     self.guardar_cambios_usuario, self.log)
-        memoria = self._guardar_memoria()
-        pendientes = [] if excel_estado != "pendiente" else [1] * (len(self.lote.filas) + len(self.lote.proveedores))
-        _guardar_estado(self.carpeta, estado="confirmado" if not self.errores else "confirmado con errores",
+        memoria = 0
+        if not estado(self.carpeta).get("memoria_guardada"):
+            memoria = self._guardar_memoria()
+        pendientes = len(a_escribir.filas) + len(a_escribir.proveedores) if excel_estado == "pendiente" else 0
+        filas_sin_archivo = [r for r in self.lote.filas if not r.excluida and r.factura_id in sin_archivo]
+        if filas_sin_archivo:
+            self.log(f"AVISO {len(filas_sin_archivo)} filas no se escribieron: su archivo no se movió")
+        _guardar_estado(self.carpeta, estado="confirmado" if not self.errores and not sin_archivo else "confirmado con errores",
                         fin=datetime.now().isoformat(timespec="seconds"), errores=self.errores,
-                        excel=excel_estado, excel_mensaje=excel_msg, excel_pendiente=len(pendientes), excel_escrito=excel_res)
-        (self.carpeta / "lote_confirmado.json").write_text(
-            json.dumps(self.lote, default=_a_json, ensure_ascii=False, indent=1), encoding="utf-8")
-        return {"hechos": self.hechos, "errores": self.errores, "excel_pendiente": len(pendientes),
-                "excel": excel_estado, "excel_mensaje": excel_msg, "excel_escrito": excel_res, "memoria": memoria}
+                        excel=excel_estado, excel_mensaje=excel_msg, excel_pendiente=pendientes, excel_escrito=excel_res,
+                        archivos_pendientes=sorted(sin_archivo), filas_sin_archivo=len(filas_sin_archivo),
+                        memoria_guardada=True)
+        self._guardar_lote()             # destinations renamed on the way ("name (2).pdf") and their links
+        return {"hechos": self.hechos, "errores": self.errores, "excel_pendiente": pendientes,
+                "excel": excel_estado, "excel_mensaje": excel_msg, "excel_escrito": excel_res, "memoria": memoria,
+                "sin_archivo": len(filas_sin_archivo)}
 
     def _guardar_memoria(self) -> int:
         """Provider details of this batch (.txt and invoices) into PROVEEDORES RUA.xlsx; never stops the batch."""
@@ -190,14 +218,15 @@ class Ejecutor:
     def _renombrar_destino(self, fid, viejo: Path, nuevo: Path) -> None:
         """Someone saved a file with that name after the review: use 'name (2).pdf' and fix the link."""
         f = next((x for x in self.lote.facturas if x.id == fid), None)
-        if not f:
-            return
-        f.destino = nuevo
+        if f:
+            f.destino = nuevo
         if self.cfg.url_base:
-            f.url = url_sharepoint(self.cfg.url_base, nuevo.parent.parent.name, nuevo.parent.name, nuevo.name)
-            for r in self.lote.filas:
+            url = url_sharepoint(self.cfg.url_base, nuevo.parent.parent.name, nuevo.parent.name, nuevo.name)
+            if f:
+                f.url = url
+            for r in self.lote.filas:        # also when retrying from lote_confirmado.json (no invoices there)
                 if r.factura_id == fid:
-                    r.url = f.url
+                    r.url = url
         self.log(f"AVISO {viejo.name} ya existía: lo guardo como {nuevo.name}")
 
     def _mover(self, p: dict) -> None:
@@ -252,14 +281,79 @@ def escribir_excel(cfg, lote, diario, carpeta_lote: Path, guardar_cambios_usuari
         return "pendiente", str(e), {"filas": 0, "proveedores": 0}
 
 
-def reintentar_excel(cfg, carpeta_lote: Path, guardar_cambios_usuario=False, log=print) -> tuple[str, str]:
-    """Writes the pending rows of a confirmed batch."""
+def continuar(cfg, carpeta_lote: Path, guardar_cambios_usuario=False, log=print, con_archivos=True) -> dict:
+    """Finishes a confirmed batch: the file steps that failed or never ran (batch cut halfway), then the rows
+    not written yet. Never repeats what the journal already has, so it can be retried any number of times."""
     from .model import cargar_lote
-    lote = cargar_lote(carpeta_lote / "lote_confirmado.json")
-    estado_, msg, res = escribir_excel(cfg, lote, Diario(carpeta_lote), carpeta_lote, guardar_cambios_usuario, log)
-    _guardar_estado(carpeta_lote, excel=estado_, excel_mensaje=msg, excel_escrito=res,
-                    excel_pendiente=0 if estado_ == "escrito" else len(lote.filas) + len(lote.proveedores))
-    return estado_, msg
+    with _uno_por_vez(carpeta_lote, YaConfirmado):
+        est = estado(carpeta_lote)
+        if est.get("estado") not in ("en curso", "confirmado", "confirmado con errores"):
+            raise YaConfirmado(f"el lote {carpeta_lote.name} está {est.get('estado') or 'sin confirmar'}")
+        lote = cargar_lote(carpeta_lote / "lote_confirmado.json")
+        ej = Ejecutor(cfg, lote, carpeta_lote, log=log, guardar_cambios_usuario=guardar_cambios_usuario,
+                      modo=est.get("modo", ""))
+        if con_archivos:
+            ej._pasos()
+        return ej._terminar()
+
+
+def reintentar_excel(cfg, carpeta_lote: Path, guardar_cambios_usuario=False, log=print) -> tuple[str, str]:
+    """Writes the pending rows of a confirmed batch (only those not written yet)."""
+    r = continuar(cfg, carpeta_lote, guardar_cambios_usuario, log, con_archivos=False)
+    return r["excel"], r["excel_mensaje"]
+
+
+def _hecho(p: dict, pasos: list[dict]) -> bool:
+    """This plan step is already in the journal."""
+    if p["op"] == "proveedor_nuevo":
+        linea = f"{p['cuit']};{p['area']};{p['nombre']};{p['carpeta']}"
+        return any(x["op"] == "csv_linea" and x.get("linea") == linea for x in pasos)
+    return any(x["op"] in ("mover", "copiar") and x.get("de") == p.get("de") for x in pasos)
+
+
+def _sin_archivo(lote, pasos: list[dict]) -> set[str]:
+    """Invoices whose PDF was not saved in its folder: their rows would point to nothing."""
+    return {p["factura"] for p in lote.plan
+            if p["op"] in ("mover", "copiar") and p.get("factura") and not _hecho(p, pasos)}
+
+
+def _escritas(pasos: list[dict]) -> tuple[set[str], bool]:
+    """(invoices with rows already saved in the workbook, provider rows already saved)."""
+    from . import excel
+    guardados = excel.pasos_guardados(pasos)
+    return ({x.get("factura") for x in guardados if x["op"] == "fila_excel"},
+            any(x["op"] == "proveedor_excel" for x in guardados))
+
+
+def _sin_lo_escrito(lote, pasos: list[dict], sin_archivo: set[str]):
+    from dataclasses import replace
+    facturas, provs = _escritas(pasos)
+    return replace(lote, filas=[r for r in lote.filas if not r.excluida and r.factura_id not in facturas
+                                and r.factura_id not in sin_archivo],
+                   proveedores=[] if provs else lote.proveedores)
+
+
+def ocupado(carpeta: Path) -> bool:
+    return str(carpeta.resolve()).lower() in _ocupados
+
+
+def etiqueta(carpeta: Path) -> str:
+    """State for Historial: a batch left "en curso" by a closed app shows as cut halfway."""
+    e = estado(carpeta).get("estado", "")
+    if e == "en curso" and not ocupado(carpeta):
+        return "quedó a medias"
+    return e or "solo leído / simulado"
+
+
+def donde(carpeta: Path) -> tuple[str, str]:
+    """("prueba" | "real" | "", workbook) where the batch was loaded. Old batches: guessed from the journal."""
+    e = estado(carpeta)
+    planilla = e.get("planilla") or next((x["libro"] for x in Diario(carpeta).pasos if x.get("libro")), "")
+    modo = e.get("modo", "")
+    if not modo and planilla:
+        from .config import carpeta_app
+        modo = "prueba" if str(planilla).lower().startswith(str(carpeta_app() / "prueba").lower()) else "real"
+    return modo, planilla
 
 
 def _a_json(o):
@@ -273,7 +367,8 @@ def lotes_confirmados(carpeta_lotes: Path) -> list[Path]:
     if not carpeta_lotes.exists():
         return []
     return sorted((d for d in carpeta_lotes.iterdir()
-                   if d.is_dir() and estado(d).get("estado", "").startswith("confirmado")), key=lambda d: d.name)
+                   if d.is_dir() and estado(d).get("estado", "").startswith(("confirmado", "en curso"))
+                   and not ocupado(d)), key=lambda d: d.name)
 
 
 def ultimo_confirmado(carpeta_lotes: Path) -> Path | None:
@@ -286,15 +381,30 @@ def deshacer(carpeta_lote: Path, log=print, cfg=None) -> list[str]:
     Returns the problems (things that changed after the batch). If the workbook can't be
     opened, nothing is undone (so rows never point to files that moved back)."""
     with _uno_por_vez(carpeta_lote, YaDeshecho):
-        if estado(carpeta_lote).get("estado") == "deshecho":
+        e = estado(carpeta_lote)
+        if e.get("estado") == "deshecho":
+            if e.get("memoria_pendiente"):
+                return _deshacer_memoria(carpeta_lote, log, cfg)
             raise YaDeshecho(f"el lote {carpeta_lote.name} ya estaba deshecho")
         return _deshacer(carpeta_lote, log, cfg)
+
+
+def _deshacer_memoria(carpeta_lote: Path, log, cfg) -> list[str]:
+    """Second try of the provider-memory part (the rest of the batch was already undone)."""
+    from . import maestro
+    if cfg is None:
+        from .config import cargar
+        cfg = cargar()
+    problemas = maestro.deshacer(cfg, carpeta_lote / HIST_MEMORIA, todo=True, log=log)
+    _guardar_estado(carpeta_lote, memoria_pendiente=False)
+    return problemas
 
 
 def _deshacer(carpeta_lote: Path, log, cfg) -> list[str]:
     from . import excel
     pasos = Diario(carpeta_lote).pasos
     problemas: list[str] = []
+    memoria_pendiente = False
     if excel.pasos_guardados(pasos):
         if cfg is None:
             from .config import cargar
@@ -308,7 +418,9 @@ def _deshacer(carpeta_lote: Path, log, cfg) -> list[str]:
         try:
             problemas += maestro.deshacer(cfg, carpeta_lote / HIST_MEMORIA, todo=True, log=log)
         except Exception as ex:
-            problemas.append(f"memoria de proveedores: {ex}")
+            # kept pending: touching Deshacer again retries only this part
+            memoria_pendiente = True
+            problemas.append(f"memoria de proveedores (quedó pendiente: volvé a tocar Deshacer): {ex}")
     for p in reversed(pasos):
         op = p["op"]
         try:
@@ -353,5 +465,5 @@ def _deshacer(carpeta_lote: Path, log, cfg) -> list[str]:
         except Exception as ex:
             problemas.append(f"{op}: {ex}")
     _guardar_estado(carpeta_lote, estado="deshecho", deshecho=datetime.now().isoformat(timespec="seconds"),
-                    problemas_deshacer=problemas)
+                    problemas_deshacer=problemas, memoria_pendiente=memoria_pendiente)
     return problemas

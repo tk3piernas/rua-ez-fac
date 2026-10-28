@@ -53,7 +53,10 @@ def crear(r: Path) -> None:
 
 def leer(cfg) -> dict[str, dict]:
     """clave -> {"fila", "valores" (15, as text)}. Empty if the file doesn't exist yet."""
-    r = ruta(cfg)
+    return leer_archivo(ruta(cfg))
+
+
+def leer_archivo(r: Path | None) -> dict[str, dict]:
     if not r or not r.is_file():
         return {}
     from openpyxl import load_workbook
@@ -197,13 +200,22 @@ def ultimo(historial: Path) -> dict | None:
     return next((e for e in reversed(_leer_hist(historial)) if not e["deshecho"] and e["cambios"]), None)
 
 
-def deshacer(cfg, historial: Path, todo: bool = False, log=print) -> list[str]:
-    """Undoes the last change of `historial` (or all of them, newest first). Only rows still as the app left
-    them go back; if the app created the file and nobody touched it since, the file is deleted."""
+def ultimo_de(historiales: list[Path]) -> tuple[Path, dict] | None:
+    """The newest change not undone among several histories (the one of pasted data and one per batch)."""
+    todos = [(h, e) for h in historiales for e in _leer_hist(h) if not e["deshecho"] and e["cambios"]]
+    return max(todos, key=lambda he: he[1]["id"], default=None)
+
+
+def deshacer(cfg, historial: Path, todo: bool = False, log=print, id_: str = "") -> list[str]:
+    """Undoes the last change of `historial` (or all of them, newest first; or the one with `id_`). Only rows
+    still as the app left them go back; if the app created the file and nobody touched it since, it is deleted.
+    Works on the file saved in the history, whatever mode (test / real) the app is in now."""
     from . import excel
     hist = _leer_hist(historial)
     pendientes = [e for e in reversed(hist) if not e["deshecho"]]
-    if not todo:
+    if id_:
+        pendientes = [e for e in pendientes if e["id"] == id_]
+    elif not todo:
         pendientes = pendientes[:1]
     problemas: list[str] = []
     for e in pendientes:
@@ -214,7 +226,7 @@ def deshacer(cfg, historial: Path, todo: bool = False, log=print) -> list[str]:
             r.unlink()
             log(f"BORRO  {r.name} (la había creado la app)")
         elif e["cambios"]:
-            memoria = {m["fila"]: m["valores"] for m in leer(cfg).values()} if ruta(cfg) == r else {}
+            memoria = {m["fila"]: m["valores"] for m in leer_archivo(r).values()}
             libro = excel.abrir(cfg, r)
             try:
                 if not libro.saved:
@@ -231,10 +243,10 @@ def deshacer(cfg, historial: Path, todo: bool = False, log=print) -> list[str]:
                 libro.guardar()
             finally:
                 libro.cerrar()
-            if e["creado"] and ruta(cfg) == r and not leer(cfg):
+            if e["creado"] and not leer_archivo(r):
                 r.unlink()
                 log(f"BORRO  {r.name} (la había creado la app y quedó vacía)")
         e["deshecho"] = True
-    if pendientes:
+        # saved after each change: if a later one fails, the ones already undone are not tried again
         historial.write_text(json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
     return problemas

@@ -63,3 +63,19 @@ def test_boton_no_permitido_queda_apagado():
             return self
     b = ui.mientras_libre(Boton(), False, "no")
     assert (b.enabled, b.binds, b.tip) == (False, 0, "no")
+
+
+def test_para_leer_y_nuevos_desde_la_ultima_lectura(tmp_path, monkeypatch):
+    """G5: the header badge counts what waits in _Entrada and what arrived after the last reading."""
+    monkeypatch.setenv("APPFACTURAS_HOME", str(tmp_path / "app"))
+    cfg = ui.config.Config(base=tmp_path / "Facturas pendientes")
+    (cfg.entrada / "Vehicular").mkdir(parents=True)
+    a = cfg.entrada / "Vehicular" / "a.pdf"
+    a.write_bytes(b"x")
+    assert ui.para_leer(cfg) == (1, 0)                 # never read: no "new" yet
+    ui.recordar_lectura(cfg, ui.archivos_para_leer(cfg))
+    assert ui.para_leer(cfg) == (1, 0)
+    (cfg.entrada / "Vehicular" / "b.pdf").write_bytes(b"y")
+    assert ui.para_leer(cfg) == (2, 1)
+    a.unlink()
+    assert ui.para_leer(cfg) == (1, 1)

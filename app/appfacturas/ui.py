@@ -92,6 +92,7 @@ class Estado_:
     resultado: dict | None = None
     log: list[str] = []
     ocupado: bool = False                 # a confirm, undo or retry is running: those buttons wait
+    leer_ahora: dict = {}                 # client id -> read now (set by its Cargar panel; used by the header badge)
 
 
 S = Estado_()
@@ -222,12 +223,64 @@ def entradas(cfg):
     return ents, txts
 
 
+def archivos_para_leer(cfg) -> list[Path]:
+    """What 'Leer facturas' would read now: _Entrada\\<area> and what was uploaded through the app."""
+    out = []
+    if cfg and cfg.base:
+        for a in cfg.areas:
+            d = cfg.entrada / a
+            if d.is_dir():
+                out += [f for f in d.iterdir() if f.is_file()]
+    return out + lista_subidos()
+
+
+def _marcas(fs: list[Path]) -> list[str]:
+    out = []
+    for f in fs:
+        try:
+            out.append(f"{str(f).lower()}|{int(f.stat().st_mtime)}")
+        except OSError:
+            pass
+    return out
+
+
+def _archivo_lectura() -> Path:
+    return datos() / "ultima_lectura.json"
+
+
+def recordar_lectura(cfg, fs: list[Path]) -> None:
+    """Which files the last reading saw (per 'Facturas pendientes'), to tell new ones apart later."""
+    import json
+    try:
+        d = json.loads(_archivo_lectura().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    d[str(cfg.base).lower()] = _marcas(fs)
+    _archivo_lectura().parent.mkdir(parents=True, exist_ok=True)
+    _archivo_lectura().write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+def para_leer(cfg) -> tuple[int, int]:
+    """(files waiting to be read, how many of them are new since the last reading; 0 if never read)."""
+    import json
+    fs = archivos_para_leer(cfg)
+    try:
+        vistos = json.loads(_archivo_lectura().read_text(encoding="utf-8")).get(str(cfg.base).lower())
+    except (OSError, ValueError):
+        vistos = None
+    if vistos is None:
+        return len(fs), 0
+    return len(fs), len(set(_marcas(fs)) - set(vistos))
+
+
 def armar(cfg):
     lid = ahora_id()
     trabajo = datos() / "lotes" / lid
+    leidos = archivos_para_leer(cfg)
     ents, txts = entradas(cfg)
     lote = Armador(cfg, simular=False, trabajo=trabajo).procesar(ents, txts)
     reporte.guardar(lote, trabajo.parent, reporte.texto(lote, cfg))
+    recordar_lectura(cfg, leidos)
     return lote, trabajo
 
 
@@ -338,6 +391,7 @@ def pagina():
                 ui.button("Abrir planilla", icon="table_view", on_click=abrir_planilla).props("flat color=white").tooltip(
                     "Abre en Excel la planilla en la que está escribiendo la app (la real o la copia de prueba)")
                 ui.button("Exportar planilla", icon="file_download", on_click=dialogo_exportar).props("flat color=white")
+                aviso_para_leer()
         # mode on the right and, last of all, Salir at the far right (also when the header wraps)
         with ui.row().classes("items-center gap-3 ml-auto"):
             lbl_modo = ui.label().classes("pill")
@@ -378,6 +432,24 @@ def pagina():
             with ui.tab_panel(t_conf).classes("items-center"):
                 panel_config(refrescar_modo)
     refrescar_modo()
+
+
+@ui.refreshable
+def aviso_para_leer() -> None:
+    if not S.cfg:
+        return
+    n, nuevos = para_leer(S.cfg)
+    if not n:
+        return
+    texto = f"{n} para leer" + (f" · {nuevos} nuevos" if nuevos else "")
+    async def clic():
+        f = S.leer_ahora.get(ui.context.client.id)
+        if f:
+            await f()
+    ui.button(texto, icon="mark_email_unread", on_click=clic).props(
+        "unelevated rounded dense color=white text-color=primary").classes("px-3").tooltip(
+        "Hay archivos esperando en _Entrada o subidos acá" + (" (y algunos llegaron después de la última lectura)"
+                                                                if nuevos else "") + ". Clic: ir a Cargar y leerlos.")
 
 
 def aviso_alfa() -> None:
@@ -474,8 +546,17 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                 panel_historial.refresh()
                 tabs.set_value(t_rev)
             ui.button("Leer facturas", icon="search", on_click=leer).props("size=lg color=secondary unelevated").classes("px-6")
+
+            async def ir_y_leer():
+                """Header badge: read from any tab (leer() then opens Revisión)."""
+                n = ui.notification("Leyendo las facturas…", spinner=True, timeout=None)
+                try:
+                    await leer()
+                finally:
+                    n.dismiss()
+            S.leer_ahora[ui.context.client.id] = ir_y_leer
             ui.label("Leer no mueve ni escribe nada.").classes("text-xs text-gray-500 text-center")
-    ui.timer(5.0, lambda: contar.refresh())
+    ui.timer(5.0, lambda: (contar.refresh(), aviso_para_leer.refresh()))
 
 
 # ------------------------------------------------------------------ Revisión

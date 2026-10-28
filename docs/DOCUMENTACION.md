@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.12.2 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.13.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -69,6 +69,7 @@ Estructura de la carpeta de la app:
 - Cuando el servidor está listo, abre la app en una ventana propia de Edge, o de Chrome si no está Edge, con `--app=`: sin pestañas ni barra de direcciones. Si no encuentra ninguno de los dos, usa el navegador predeterminado.
 - Con `pythonw` no hay consola: lo que pasa queda en `datos\app.log`.
 - Arriba, al lado del nombre de la app:
+  - **N para leer**: aparece cuando hay archivos esperando en `_Entrada` o subidos en la app (se actualiza cada 5 segundos), y agrega "· M nuevos" si llegaron después de la última lectura (se recuerda en `datos\ultima_lectura.json`). Un clic lee desde cualquier pestaña y abre Revisión.
   - **Abrir planilla**: abre en Excel la planilla en la que escribe la app (la real o la copia de prueba, según el modo).
   - **Exportar planilla**: guarda una copia con el nombre que elijas (por defecto `DEUDA A PAGAR ARG dd-mm-aaaa`) en la carpeta `Planillas exportadas`, al lado de la planilla. Usa `SaveCopyAs` de Excel, así que si está abierta incluye lo que tenga sin guardar; la planilla no cambia. Nunca pisa una exportada con el mismo nombre. Después de exportar se puede abrir la copia o deshacer (la borra si nadie la tocó). Para empezar de cero después, Reset.
 - Deshacer un lote que ya estaba deshecho no hace nada (antes, un segundo clic informaba como "cambió después" todo lo que ya había vuelto).
@@ -239,5 +240,4 @@ Estructura de la carpeta de la app:
 
 - Primera corrida real: Matheo elige "Cargar en la planilla real".
 - Modos con Claude: A (API, clave en el Administrador de credenciales de Windows) y B (Cowork, `_Revisar con Claude\<lote>\`).
-- Aviso de "N para leer" en el encabezado (G5).
 - Retirar el PS1.

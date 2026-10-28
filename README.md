@@ -54,7 +54,7 @@ Pestaña **Revisar**: compara la planilla con las carpetas y te dice qué mirar 
 
 ## Abrir y exportar la planilla
 
-Arriba, al lado del nombre de la app: **Abrir planilla** abre en Excel la planilla en la que está escribiendo la app (la real o la de prueba). **Exportar planilla** guarda una copia con el nombre que elijas en `Planillas exportadas`, al lado de la planilla; la planilla sigue igual. Si después querés empezarla de cero, usá el Reset.
+Arriba, al lado del nombre de la app: si hay facturas esperando aparece **N para leer** (un clic las lee). **Abrir planilla** abre en Excel la planilla en la que está escribiendo la app (la real o la de prueba). **Exportar planilla** guarda una copia con el nombre que elijas en `Planillas exportadas`, al lado de la planilla; la planilla sigue igual. Si después querés empezarla de cero, usá el Reset.
 
 ## Empezar la planilla de cero
 

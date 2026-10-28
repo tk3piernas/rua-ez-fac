@@ -54,6 +54,9 @@ body { background: linear-gradient(180deg, #e9ebf7 0px, #f6f7fc 320px) fixed; co
 .contenido { width: 100%; max-width: 1600px; margin: 0 auto; padding-bottom: 140px; }
 .alfa { position: fixed; right: 18px; bottom: 18px; z-index: 2000; width: 300px; border-radius: 18px; background: #fff;
         border: 1px solid #f6d5c8; box-shadow: 0 12px 32px rgba(20,20,122,.18) !important; }
+.q-dialog .seccion { overflow-y: auto; max-height: 88vh; }
+.dialogo-botones { position: sticky; bottom: -24px; background: #fff; padding: 10px 0 4px; z-index: 1;
+                   border-top: 1px solid var(--linea); }
 .chequeo-ok { color: #15803d; } .chequeo-falta { color: #dc2626; } .chequeo-aviso { color: #d97706; }
 """
 
@@ -729,7 +732,7 @@ async def dialogo_setup():
             cuerpo.refresh()
             btn.set_visibility(bool(plan["dirs"] or plan["archivos"]))
 
-        with ui.row().classes("w-full justify-center gap-3"):
+        with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
             btn = ui.button("Crear lo que falta", icon="add_circle", on_click=crear).props("color=secondary unelevated")
             btn.set_visibility(bool(plan["dirs"] or plan["archivos"]))
             ui.button("Cerrar", on_click=dlg.close).props("flat")
@@ -751,7 +754,7 @@ async def dialogo_reset():
                  "planilla y otra en datos\\backups.").classes("text-sm text-center")
         provs = ui.checkbox("También vaciar la hoja Proveedores")
         conf = ui.input("Escribí BORRAR para confirmar").classes("w-64")
-        with ui.row().classes("justify-center gap-3"):
+        with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
             ok_btn = ui.button("Vaciar la planilla", icon="delete_forever",
                                on_click=lambda: dlg.submit(True)).props("color=negative unelevated")
             ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")

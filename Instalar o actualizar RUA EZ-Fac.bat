@@ -14,6 +14,8 @@ echo   Carpeta: %~dp0
 echo.
 echo %~dp0 | findstr /i /c:"OneDrive" >nul
 if not errorlevel 1 goto :enonedrive
+echo %~dp0 | findstr /i /c:"Para subir a GitHub" >nul
+if not errorlevel 1 goto :espejo
 
 echo [1/5] Python ...
 if exist "%PY%" goto :tengo_venv
@@ -21,7 +23,13 @@ set "BASEPY="
 py -3.15 -c "pass" >nul 2>&1 && set "BASEPY=py -3.15"
 if defined BASEPY goto :crear_venv
 where py >nul 2>&1
-if errorlevel 1 goto :sinpython
+if errorlevel 1 goto :espejo
+echo Esta carpeta es solo para subir los archivos a GitHub: no se instala desde aca.
+echo Usa el instalador de la carpeta de la app (Documentos\App Facturas).
+pause
+exit /b 1
+
+:sinpython
 echo       No tengo Python 3.15; lo instalo con el Python Install Manager ...
 py install 3.15
 py -3.15 -c "pass" >nul 2>&1 && set "BASEPY=py -3.15"

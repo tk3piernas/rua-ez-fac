@@ -190,7 +190,7 @@ def extraccion(x: dict, cfg) -> Extraccion:
                                 monto=parse_monto(str(it.get("monto"))) if it.get("monto") not in (None, "") else None,
                                 tareas=[t for t in tareas if cfg.tarea_min <= int(t) <= cfg.tarea_max]))
     e.fiscal = bool(cuit_valido(e.cuit) and e.nro is not None)
-    e.notas.append("La leyó Claude (Cowork): revisá CUIT, número y montos contra el PDF antes de confirmar")
+    e.notas.append("La leyó Claude: revisá CUIT, número y montos contra el PDF antes de confirmar")
     e.confianza = 0.5
     return e
 

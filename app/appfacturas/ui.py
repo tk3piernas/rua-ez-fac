@@ -832,8 +832,54 @@ def seccion_claude(lote, cfg):
                           "'Leé pedido.md y hacé lo que dice'. Cuando termine, tocá Leer facturas de nuevo.",
                           type="positive", multi_line=True, timeout=0, close_button=True)
                 panel_revision.refresh()
-            mientras_libre(ui.button("Preparar el pedido para Claude", icon="smart_toy", on_click=preparar_claude).props(
-                "color=secondary unelevated"), puede_escribir(cfg), SOLO_SIMULAR)
+            @de_a_uno
+            async def leer_con_api():
+                from . import claude_api
+                if not puede_escribir(cfg):
+                    ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+                    return
+                elegidas = [f for f in cands if marcados[f.id].value]
+                if not elegidas:
+                    ui.notify("No elegiste ningún PDF", type="info")
+                    return
+                with ui.dialog() as dlg, ui.card().classes("items-center"):
+                    ui.label(f"¿Mando {len(elegidas)} PDF a la API de Claude?").classes("font-bold")
+                    ui.label("Se envían a Anthropic para leerlos (solo los PDF elegidos, nunca los .txt). Cuesta unos "
+                             "centavos de dólar por factura, que se cobran en la cuenta de la clave.").classes(
+                        "text-sm text-center")
+                    with ui.row().classes("justify-center"):
+                        ui.button("Sí, leer con Claude", on_click=lambda: dlg.submit(True)).props("color=secondary")
+                        ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+                if not await dlg:
+                    return
+                try:
+                    r = await con_espera(f"Claude está leyendo {len(elegidas)} PDF…", claude_api.leer, cfg, lote,
+                                         elegidas, lambda s: None)
+                except claude_api.SinClave as ex:
+                    ui.notify(f"No pude: {ex}.", type="warning", multi_line=True)
+                    return
+                except Exception as ex:
+                    ui.notify(f"No pude leer con Claude: {ex}", type="negative", multi_line=True)
+                    return
+                if r["errores"]:
+                    ui.notify("Claude no pudo con: " + "; ".join(f"{n} ({m})" for n, m in r["errores"]),
+                              type="warning", multi_line=True, timeout=0, close_button=True)
+                if r["leidas"]:
+                    ui.notify(f"Claude leyó {r['leidas']}. Vuelvo a leer el lote con eso.", type="positive")
+                    f_leer = S.leer_ahora.get(ui.context.client.id)
+                    if f_leer:
+                        await f_leer()
+                        return
+                panel_revision.refresh()
+
+            from . import claude_api
+            hay_clave = bool(claude_api.origen_clave())
+            with ui.row().classes("justify-center gap-3"):
+                mientras_libre(ui.button("Leer ahora con la API de Claude", icon="bolt", on_click=leer_con_api).props(
+                    "color=secondary unelevated"), puede_escribir(cfg) and hay_clave,
+                    SOLO_SIMULAR if not puede_escribir(cfg) else "Falta la clave de la API (Configuración → Claude)")
+                mientras_libre(ui.button("Preparar el pedido para Claude (Cowork)", icon="smart_toy",
+                                         on_click=preparar_claude).props("outline"), puede_escribir(cfg), SOLO_SIMULAR)
         if peds:
             ui.label("Pedidos a Claude").classes("font-bold text-sm mt-2")
             for pd in peds[:10]:
@@ -857,6 +903,42 @@ def seccion_claude(lote, cfg):
                 ui.button("Leer facturas de nuevo (con lo de Claude)", icon="refresh",
                           on_click=lambda: S.leer_ahora.get(ui.context.client.id) and S.leer_ahora[ui.context.client.id]()
                           ).props("outline")
+
+
+@ui.refreshable
+def panel_clave_claude():
+    """Modo A: the API key, kept in the Windows Credential Manager (never in a file)."""
+    from . import claude_api
+    with seccion("Claude para lo que no se puede leer", "bolt", "w-[760px]"):
+        ui.label("Con una clave de la API de Claude, en Revisión aparece 'Leer ahora con la API de Claude' para los "
+                 "PDF que la app no pudo leer. La clave se guarda en el Administrador de credenciales de Windows, "
+                 "nunca en un archivo. Cada factura cuesta unos centavos de dólar en la cuenta de la clave.").classes(
+            "text-sm text-gray-600 text-center")
+        origen = claude_api.origen_clave()
+        ui.label(f"Clave: {'guardada en ' + origen if origen else 'no hay ninguna'}").classes(
+            "text-sm text-center " + ("chequeo-ok" if origen else "text-gray-500"))
+        with ui.row().classes("justify-center items-center gap-3"):
+            entrada = ui.input("Clave de la API (sk-ant-…)", password=True, password_toggle_button=True).classes("w-96")
+
+            def guardar():
+                try:
+                    claude_api.guardar_clave(entrada.value)
+                except Exception as ex:
+                    ui.notify(f"No la guardé: {ex}", type="warning")
+                    return
+                entrada.value = ""
+                ui.notify("Clave guardada en el Administrador de credenciales de Windows", type="positive")
+                panel_clave_claude.refresh()
+                panel_revision.refresh()
+
+            def borrar():
+                claude_api.borrar_clave()
+                ui.notify("Clave borrada del Administrador de credenciales", type="positive")
+                panel_clave_claude.refresh()
+                panel_revision.refresh()
+            ui.button("Guardar la clave", icon="key", on_click=guardar).props("color=secondary unelevated")
+            if origen.startswith("Administrador"):
+                ui.button("Borrar la clave", icon="delete", on_click=borrar).props("flat color=negative")
 
 
 # ------------------------------------------------------------------ Resultado
@@ -1445,6 +1527,8 @@ def panel_config(refrescar_modo):
                 ui.button("Reset de la planilla…", icon="delete_forever", on_click=dialogo_reset).props(
                     "color=negative outline")
                 volver_reset_boton()
+
+        panel_clave_claude()
 
         with seccion("Cómo se carga", "tune", "w-[760px]"):
             def cambiar_filas(e):

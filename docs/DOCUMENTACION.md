@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.14.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.15.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -90,6 +90,8 @@ Estructura de la carpeta de la app:
      - Editar **Monto**: en Factura B, C o no fiscal H sigue en 0; en Factura A, H vuelve a la fórmula (el IVA leído era del monto anterior) y lo avisa.
    - Secciones de lo que no se carga, los proveedores nuevos y los archivos que se mueven.
    - **Pasarle a Claude lo que no pude leer** (modo B, Cowork): si hay PDF no leídos (escaneados o con un formato desconocido), *Preparar el pedido para Claude* copia los elegidos a `Facturas pendientes\_Revisar con Claude\<lote>\` con `pedido.md` (instrucciones y formato) y `pedido.json` (archivos y SHA256). Los originales quedan en `_Entrada`. Nunca van los .txt; un PDF con un CBU impreso queda destildado, y el pedido le pide a Claude no copiar datos bancarios ni personales. En Cowork se abre esa carpeta y se le pide "Leé pedido.md y hacé lo que dice"; Claude escribe `respuesta.json`. Al leer de nuevo, cada PDF no leído con respuesta (se busca por SHA256) se toma de ahí: fuente "claude", fila violeta y aviso REVISAR; sigue el camino normal (duplicados, grilla, confirmar, deshacer). Una respuesta con `no_pude` se ignora. Si Claude la leyó pero no se puede cargar (por ejemplo un CUIT con el dígito verificador mal, como el de la factura de ejemplo de ARCA), queda en `_Entrada` con un aviso que dice por qué, y no se vuelve a ofrecer para mandar. La lista "Pedidos a Claude" muestra cuántos se respondieron, con Abrir la carpeta y Borrar (solo tiene copias). En Solo simular el botón está deshabilitado.
+   - **Leer ahora con la API de Claude** (modo A, `claude_api.py`): con una clave guardada (Configuración → *Claude para lo que no se puede leer*), manda los PDF no leídos elegidos a la API (modelo `claude-opus-5-5`, effort `medium`, respuesta en JSON con esquema fijo, `fallbacks: "default"` por si una política la rechaza) y pide confirmación antes, porque cada factura cuesta unos centavos de dólar. La respuesta se guarda como un pedido más (`_Revisar con Claude\<lote> API\` con `pedido.json` y `respuesta.json`) y el lote se vuelve a leer solo: las facturas leídas quedan violeta con aviso REVISAR, igual que en el modo B. Un error de una factura (conexión, límite, rechazo) no frena las demás y se muestra. El esquema no tiene campos para datos bancarios, nunca van los .txt y los PDF con CBU impreso quedan destildados.
+   - **Clave de la API:** se guarda en el Administrador de credenciales de Windows (`keyring`, servicio "RUA EZ-Fac"), nunca en un archivo; también sirve la variable de entorno `ANTHROPIC_API_KEY`. Se puede borrar desde Configuración.
    - Botones Confirmar y Copiar al portapapeles. Si no hay avisos para revisar ni que frenen y nada excluido, Confirmar carga directo (sin el "¿Confirmo?"); si hay, pregunta.
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
 4. **Historial:**
@@ -242,4 +244,3 @@ Herramientas aparte (fuera del paquete, en `app\herramientas\`): `prueba.py move
 - Probar el reset con Excel real (COM) en la PC, primero sobre la carpeta de prueba.
 
 - Primera corrida real: Matheo elige "Cargar en la planilla real".
-- Modo A con Claude (API, clave en el Administrador de credenciales de Windows). El modo B (Cowork) ya está.

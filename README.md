@@ -50,7 +50,7 @@ En **Historial → Tanda de pagos**, *Cerrar la tanda N…* guarda una copia de 
 
 ## Lo que la app no puede leer
 
-Si hay PDF que no se pudieron leer (escaneados, por ejemplo), en Revisión aparece **Pasarle a Claude lo que no pude leer**: prepara una carpeta con esos PDF y un pedido para Claude (Cowork). Le pedís a Claude que lo lea, y al volver a leer las facturas la app usa lo que respondió (en violeta, para revisar). Nunca manda los .txt ni datos bancarios.
+Si hay PDF que no se pudieron leer (escaneados, por ejemplo), en Revisión aparece **Pasarle a Claude lo que no pude leer**: prepara una carpeta con esos PDF y un pedido para Claude (Cowork). Le pedís a Claude que lo lea, y al volver a leer las facturas la app usa lo que respondió (en violeta, para revisar). Si guardás una clave de la API de Claude en Configuración (queda en el Administrador de credenciales de Windows), también podés tocar **Leer ahora con la API de Claude** y lo hace sola, por unos centavos de dólar por factura. Nunca manda los .txt ni datos bancarios.
 
 ## Revisar la planilla
 

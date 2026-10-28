@@ -125,9 +125,24 @@ async def con_espera(mensaje: str, fn, *args):
         n.dismiss()
 
 
-def mientras_libre(boton):
-    """Button disabled while something is running."""
+def mientras_libre(boton, permitido: bool = True, motivo: str = ""):
+    """Button disabled while something is running, and always disabled when not `permitido`
+    (a plain disable() would be undone by the binding)."""
+    if not permitido:
+        boton.disable()
+        if motivo:
+            boton.tooltip(motivo)
+        return boton
     return boton.bind_enabled_from(S, "ocupado", backward=lambda o: not o)
+
+
+SOLO_SIMULAR = "Estás en 'Solo simular': para eso cambiá el modo en Configuración (Practicar o Cargar en la planilla real)."
+
+
+def puede_tocar(trabajo: Path) -> bool:
+    """A batch's files and rows can be changed (undo, continue): test batches always; real ones only in
+    'Cargar en la planilla real'."""
+    return ejecutor.donde(trabajo)[0] == "prueba" or config.cargar().modo_real
 
 
 # ------------------------------------------------------------------ paths
@@ -652,6 +667,9 @@ async def _confirmado(tabs, t_res, lote, cfg):
 
 @de_a_uno
 async def continuar(trabajo: Path, con_archivos: bool = True):
+    if not puede_tocar(trabajo):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
     pagina_ = ui.context.client.layout
     n = ui.notification("Terminando el lote…", spinner=True, timeout=None)
     try:
@@ -729,6 +747,9 @@ def panel_resultado():
                 if est.get("excel") == "pendiente":
                     @de_a_uno
                     async def reintentar():
+                        if not puede_tocar(S.trabajo):
+                            ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+                            return
                         e2, msg = await con_espera("Escribiendo las filas…", ejecutor.reintentar_excel, S.cfg, S.trabajo, False, lambda s: None)
                         S.resultado["excel"], S.resultado["excel_mensaje"] = e2, msg
                         ui.notify("Filas escritas" if e2 == "escrito" else f"Siguen pendientes: {msg}",
@@ -742,6 +763,9 @@ def panel_resultado():
 
 @de_a_uno
 async def deshacer(trabajo: Path):
+    if not puede_tocar(trabajo):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
     with ui.dialog() as dlg, ui.card().classes("items-center"):
         ui.label(f"¿Deshago el lote {trabajo.name}?").classes("font-bold")
         escritas = ejecutor.estado(trabajo).get("excel") == "escrito"
@@ -809,9 +833,11 @@ def panel_historial():
             with ui.row().classes("justify-center gap-4"):
                 if ejecutor.etiqueta(ultimo) == "quedó a medias" or e.get("archivos_pendientes") or e.get("excel") == "pendiente":
                     mientras_libre(ui.button("Terminar este lote", icon="play_arrow",
-                                             on_click=lambda: continuar(ultimo)).props("outline"))
+                                             on_click=lambda: continuar(ultimo)).props("outline"),
+                                   puede_tocar(ultimo), SOLO_SIMULAR)
                 mientras_libre(ui.button(f"Deshacer el último lote ({ultimo.name}, {ejecutor.donde(ultimo)[0].upper() or '?'})",
-                                         icon="undo", on_click=lambda: deshacer(ultimo)).props("color=negative outline"))
+                                         icon="undo", on_click=lambda: deshacer(ultimo)).props("color=negative outline"),
+                               puede_tocar(ultimo), SOLO_SIMULAR)
 
 
 def panel_tandas():
@@ -830,21 +856,22 @@ def panel_tandas():
                  "exportadas, anota qué lotes entraron y, si querés, deja la planilla vacía para la próxima.").classes(
             "text-xs text-gray-500 text-center")
         with ui.row().classes("justify-center gap-3"):
-            b = mientras_libre(ui.button(f"Cerrar la tanda {n}…", icon="inventory_2", on_click=cerrar_tanda).props(
-                "color=secondary unelevated"))
-            if not puede_escribir(cfg):
-                b.disable()
-                b.tooltip("Estás en 'Solo simular': cambiá el modo en Configuración")
+            mientras_libre(ui.button(f"Cerrar la tanda {n}…", icon="inventory_2", on_click=cerrar_tanda).props(
+                "color=secondary unelevated"), puede_escribir(cfg), SOLO_SIMULAR)
             u = tandas.ultima(datos(), cfg.planilla)
             if u:
                 mientras_libre(ui.button(f"Deshacer el cierre de la tanda {u['n']}", icon="undo",
-                                         on_click=deshacer_tanda).props("color=negative outline"))
+                                         on_click=deshacer_tanda).props("color=negative outline"),
+                               puede_escribir(cfg), SOLO_SIMULAR)
 
 
 @de_a_uno
 async def cerrar_tanda():
     from . import tandas
     cfg = S.cfg
+    if not puede_escribir(cfg):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
     n = tandas.siguiente(datos(), cfg.planilla)
     with ui.dialog() as dlg, ui.card().classes("seccion w-[620px] max-w-full items-center gap-3 p-6"):
         ui.label(f"Cerrar la tanda {n}").classes("titulo-seccion")
@@ -883,6 +910,9 @@ async def cerrar_tanda():
 @de_a_uno
 async def deshacer_tanda():
     from . import tandas
+    if not puede_escribir(S.cfg):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
     u = tandas.ultima(datos(), S.cfg.planilla)
     with ui.dialog() as dlg, ui.card().classes("items-center"):
         ui.label(f"¿Deshago el cierre de la tanda {u['n']}?").classes("font-bold")
@@ -1372,12 +1402,15 @@ def volver_reset_boton():
     r = preparar.reset_para_volver(S.cfg, datos() / "backups") if S.cfg else None
     if r:
         mientras_libre(ui.button(f"Volver al respaldo del reset ({r['fecha'].replace('T', ' ')[:16]})", icon="undo",
-                                 on_click=volver_reset).props("outline"))
+                                 on_click=volver_reset).props("outline"), puede_escribir(S.cfg), SOLO_SIMULAR)
 
 
 @de_a_uno
 async def volver_reset():
     from . import preparar
+    if not puede_escribir(S.cfg):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
     with ui.dialog() as dlg, ui.card().classes("items-center"):
         ui.label("¿Vuelvo la planilla a como estaba antes del reset?").classes("font-bold")
         ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {S.cfg.planilla}").classes("text-xs ruta")

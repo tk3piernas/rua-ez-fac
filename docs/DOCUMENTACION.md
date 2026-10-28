@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.12.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.12.2 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -110,7 +110,7 @@ Estructura de la carpeta de la app:
 6. **Configuración:**
    - **Setup** (ver abajo): crea lo que falte y muestra el chequeo.
    - **Modo de trabajo**, uno solo de tres (también se ve arriba a la derecha):
-     - **Solo simular** (por defecto): lee las facturas reales y muestra qué haría; no mueve nada ni escribe en ninguna planilla.
+     - **Solo simular** (por defecto): lee las facturas reales y muestra qué haría; no mueve nada ni escribe en ninguna planilla. Quedan deshabilitados (y frenados también por dentro) Confirmar, cerrar o deshacer una tanda, volver del reset, y deshacer, terminar o reintentar un lote real. Un lote de la carpeta de prueba se puede deshacer siempre. Exportar planilla sí funciona: guarda una copia y la planilla no cambia.
      - **Practicar en la carpeta de prueba**: trabaja de verdad sobre `<app>\prueba\` (copia de la planilla y de las carpetas). Nunca toca lo real, aunque la planilla real esté abierta. Botón para rearmar la carpeta de prueba.
      - **Cargar en la planilla real**: mueve en el OneDrive y escribe en la planilla real. Pide confirmación al elegirlo.
      - Se guarda en `[app] modo_real` (true solo en el modo real). La carpeta de prueba se elige por sesión.

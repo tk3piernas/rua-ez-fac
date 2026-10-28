@@ -1,13 +1,38 @@
-# entorno y datos locales: nunca al repo
+# ---- local only: never in the repo (public) ----
+# Python environment and caches
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
-datos/
-prueba/
-wheels/
-config.toml
+
+# what each installation creates: batches, reports, backups, logs, test copy, settings
+/datos/
+/prueba/
+/config.toml
+/wheels/
 *.zip
-# facturas reales de prueba (CUIT, CBU de proveedores): solo en la PC de Matheo
-app/tests/fixtures/
-paridad/
+
+# real invoices (provider CUIT/CBU) and the tests that use them
+/app/tests_privados/
+/app/tests/fixtures/
+
+# tools that compare against the old PS1 script / need real invoices
+/paridad/
+/Prueba de paridad.bat
+/Simular con el script viejo.bat
+/Probar Excel (prueba).bat
+/Probar mover archivos (prueba).bat
+
+# old copies and upload folders
+/Para subir a GitHub/
+/Subir a GitHub*/
+/Documentacion tecnica RUA EZ-Fac.md
+/Guia de uso RUA EZ-Fac.pdf
+/Abrir App Facturas.bat
+/Instalar o actualizar.bat
+
+# Excel lock files and Office temp files
+~$*
+
+# Claude Code local settings
+.claude/settings.local.json

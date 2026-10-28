@@ -166,9 +166,16 @@ Estructura de la carpeta de la app:
 
 ## Pruebas
 
-- En este repo: `app\tests` trae las pruebas que no necesitan facturas reales (montos, CUIT/CBU, links, empaquetado, Setup y reset de la planilla).
-- En la PC de desarrollo hay además 50 pruebas en total con facturas reales como fixtures (`app\tests\fixtures\`, fuera del repo por tener CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
-- También fuera del repo, en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).
+- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla.
+- `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
+- Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Entre las dos son 50.
+- También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).
+
+## Desarrollo con Claude Code y Git
+
+- La carpeta de la app en la PC de desarrollo es a la vez una copia de trabajo de Git del repo `tk3piernas/rua-ez-fac`. Lo que es local (entorno, datos, configuración, facturas de prueba, herramientas de paridad) está en `.gitignore`.
+- `CLAUDE.md` (en la raíz) tiene las reglas para Claude Code: qué nunca se sube, cómo probar, cómo versionar y que después de cada cambio hace commit y `git push` a `main`.
+- Un compañero que solo usa la app no necesita Git: baja el ZIP del repo o usa `Armar instalador para otra PC.bat`.
 
 ## Pendiente
 

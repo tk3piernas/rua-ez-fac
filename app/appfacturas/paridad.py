@@ -12,7 +12,10 @@ from pathlib import Path
 
 from .config import carpeta_app, cargar
 
-FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
+# real invoices used as fixtures: local only (never in the repo)
+FIXTURES = next((p for p in (Path(__file__).resolve().parents[1] / "tests_privados" / "fixtures",
+                             Path(__file__).resolve().parents[1] / "tests" / "fixtures") if p.is_dir()),
+                Path(__file__).resolve().parents[1] / "tests_privados" / "fixtures")
 
 # test batch (area; fixture; name in _Entrada). Lives with the fixtures: they are real invoices and stay off the repo.
 def lote_prueba() -> list[tuple[str, str, str]]:

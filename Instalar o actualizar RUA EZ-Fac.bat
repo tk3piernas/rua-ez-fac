@@ -67,6 +67,10 @@ if exist app\tests (
   "%PY%" -m pytest -q app\tests > datos\ultimo_test.txt 2>&1
   if errorlevel 1 echo       Algunas pruebas fallaron: detalle en datos\ultimo_test.txt
 )
+if exist app\tests_privados (
+  "%PY%" -m pytest -q app\tests_privados >> datos\ultimo_test.txt 2>&1
+  if errorlevel 1 echo       Algunas pruebas privadas fallaron: detalle en datos\ultimo_test.txt
+)
 echo.
 "%PY%" -W ignore -m appfacturas verificar
 set "RC=%errorlevel%"

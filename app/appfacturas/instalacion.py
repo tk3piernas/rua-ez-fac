@@ -9,10 +9,10 @@ from pathlib import Path
 
 from . import NOMBRE, __version__, config
 
-# what goes into the package for another PC (never tests: they have real invoices and bank details)
+# what goes into the package for another PC (never tests_privados: real invoices and bank details)
 INCLUIR = ["app/appfacturas", "requirements.txt", "requirements-ui.txt", "requirements-nodeps.txt",
            "Instalar o actualizar RUA EZ-Fac.bat", "Abrir RUA EZ-Fac (con consola).bat",
-           "Guia de uso RUA EZ-Fac.pdf", "Documentacion tecnica RUA EZ-Fac.md", "wheels"]
+           "README.md", "docs", "wheels"]
 
 
 def _ok(b: bool) -> str:

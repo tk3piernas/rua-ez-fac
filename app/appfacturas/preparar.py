@@ -281,25 +281,43 @@ def reset_planilla(cfg, backups: Path, vaciar_proveedores: bool = False, log=pri
             copias = [local, local]
         else:
             copias = respaldo_reset(Path(cfg.planilla), backups)
-        filas = {}
-        nombres = libro.nombres()
-        for area in (a for a in AREAS if a in nombres):
-            h = libro.hoja(area)
-            filas[area] = sum(1 for r in range(PRIMERA, ULTIMA + 1) if h.formula(r, "A") not in ("", None))
-            ref = next((r for r in range(PRIMERA, ULTIMA + 1) if str(h.formula(r, "H")).startswith("=")), None)
-            h.vaciar_rango(f"A{PRIMERA}:J{ULTIMA}", sin_columna="I", formula_h_desde=ref)
-            log(f"{area}: {filas[area]} filas vaciadas")
-        provs = 0
-        if vaciar_proveedores:
-            hp = libro.hoja("Proveedores")
-            provs = sum(1 for r in range(5, 301) if hp.formula(r, "A") not in ("", None) or hp.formula(r, "B") not in ("", None))
-            hp.limpiar("A5:O300")
-            log(f"Proveedores: {provs} filas vaciadas")
+        filas, provs = vaciar_libro(libro, vaciar_proveedores, log)
         libro.guardar()
     finally:
         libro.cerrar()
     _anotar_reset(Path(cfg.planilla), backups, copias)
     return {"filas": filas, "proveedores": provs, "respaldos": [str(c) for c in dict.fromkeys(copias)]}
+
+
+def contar_filas(libro) -> tuple[dict, int]:
+    """Rows with data in each area sheet and in Proveedores (what a reset would empty)."""
+    nombres = libro.nombres()
+    filas = {}
+    for area in (a for a in AREAS if a in nombres):
+        h = libro.hoja(area)
+        filas[area] = sum(1 for r in range(PRIMERA, ULTIMA + 1) if h.formula(r, "A") not in ("", None))
+    provs = 0
+    if "Proveedores" in nombres:
+        hp = libro.hoja("Proveedores")
+        provs = sum(1 for r in range(5, 301) if hp.formula(r, "A") not in ("", None) or hp.formula(r, "B") not in ("", None))
+    return filas, provs
+
+
+def vaciar_libro(libro, vaciar_proveedores: bool, log=print) -> tuple[dict, int]:
+    """The reset itself on an open workbook (not saved here): area sheets rows 12-210 without column I,
+    and optionally Proveedores A5:O300. Returns the rows emptied."""
+    filas, provs = contar_filas(libro)
+    for area in filas:
+        h = libro.hoja(area)
+        ref = next((r for r in range(PRIMERA, ULTIMA + 1) if str(h.formula(r, "H")).startswith("=")), None)
+        h.vaciar_rango(f"A{PRIMERA}:J{ULTIMA}", sin_columna="I", formula_h_desde=ref)
+        log(f"{area}: {filas[area]} filas vaciadas")
+    if vaciar_proveedores:
+        libro.hoja("Proveedores").limpiar("A5:O300")
+        log(f"Proveedores: {provs} filas vaciadas")
+    else:
+        provs = 0
+    return filas, provs
 
 
 def _archivo_reset(backups: Path) -> Path:

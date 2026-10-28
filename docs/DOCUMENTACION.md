@@ -159,6 +159,39 @@ Estructura de la carpeta de la app:
 - Si la planilla está abierta con cambios sin guardar, no hace nada.
 - Después de un reset, deshacer un lote anterior ya no borra filas de la planilla (no las encuentra), pero sí devuelve los archivos.
 
+## Borrar todo (borrado.py)
+
+Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <fecha>` y se puede deshacer. Por ahora está solo el módulo y sus tests; la pantalla (Configuración → Zona de peligro) viene después.
+
+- **Lista cerrada.** Nunca se recorre la raíz del OneDrive para decidir qué se lleva. Solo se llevan estos nombres fijos:
+  - en la raíz del OneDrive: `Facturas pendientes\` entero, `PROVEEDORES RUA.xlsx` y los `DEUDA A PAGAR ARG - respaldo *.xlsx`;
+  - de `Planillas exportadas\`, los `.xlsx`; de `Respaldos\`, los `DEUDA A PAGAR ARG - respaldo *.xlsx`. Si en esas carpetas hay otra cosa, esa queda y se avisa;
+  - en la app (solo en "Cargar en la planilla real"): lo de `datos\` salvo `recorrido.json`, `app.log` y `borrado.json`, y `prueba\`.
+- **Nunca toca** `config.toml`, `.venv\`, el código, la clave de Claude ni nada más del OneDrive.
+- **Controles de cada ruta, antes del primer movimiento.** Si una falla, no mueve nada:
+  - está dentro de su carpeta;
+  - no es un link ni una junction, ni tiene uno adentro;
+  - no es nada de lo protegido;
+  - la planilla y `Facturas pendientes` están juntas en una carpeta `OneDrive - …`.
+- **Practicar** trabaja solo sobre `prueba\OneDrive - Rua Asistencia` (si la raíz es otra, frena) y no toca `datos\`. **Cargar en la planilla real** necesita `modo_real`.
+- **Pasos:**
+  1. Chequeo previo:
+     - que no haya otro borrado sin deshacer;
+     - que la planilla no tenga cambios sin guardar;
+     - que ningún archivo esté abierto en otro programa (se abre sin compartir y sin bajarlo de la nube);
+     - que haya lugar para el zip.
+  2. Zip de respaldo en `%USERPROFILE%\Documents` (nunca en el OneDrive ni en la app), con `LISTA.json` y el SHA256 de cada archivo, verificado.
+  3. Mueve cada cosa con `os.rename`: mismo disco y nunca encima de algo. Anota cada movimiento en `datos\borrado.json` (`borrado_prueba.json` en Practicar) antes y después de hacerlo.
+  4. Guarda una copia de la planilla en `_Borrado` y la vacía en el mismo archivo, con el mismo código que el reset (`preparar.vaciar_libro`): hojas de área, filas 12–210, sin tocar la I; y Proveedores A5:O300.
+  5. Setup de nuevo: carpetas vacías y `proveedores.csv` con el encabezado.
+  - Si algo falla en los pasos 3 o 4, devuelve todo lo que ya movió y la planilla desde la copia.
+- **Deshacer** (`borrado.deshacer`) lee solo el registro:
+  - Devuelve cada cosa a su lugar. Si una carpeta ya existe (porque la rearmó el Setup), mete adentro lo que vuelve.
+  - Un archivo que apareció después del borrado no se pisa: el viejo queda en `_Borrado` y se avisa (estado "deshecho a medias", se puede reintentar).
+  - La planilla vuelve de la copia solo si nadie la cambió desde el borrado (SHA256) y está cerrada en Excel.
+  - El `proveedores.csv` vacío del Setup se saca si sigue igual.
+- **Vaciar definitivamente** (`borrado.vaciar`): hay que escribir VACIAR. Manda a la papelera de Windows (`SHFileOperation` con deshacer) solo las carpetas `_Borrado …` del registro que están justo en la raíz del OneDrive o de la app. Lo del OneDrive va además a la papelera de OneDrive. Nunca usa `rmtree`.
+
 ## Reglas de negocio
 
 - **Lectura de PDF:**

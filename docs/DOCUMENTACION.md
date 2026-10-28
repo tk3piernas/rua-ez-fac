@@ -161,7 +161,15 @@ Estructura de la carpeta de la app:
 
 ## Borrar todo (borrado.py)
 
-Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <fecha>` y se puede deshacer. Por ahora está solo el módulo y sus tests; la pantalla (Configuración → Zona de peligro) viene después.
+Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <fecha>` y se puede deshacer.
+
+- **Pantalla:** Configuración → **Zona de peligro** (sección roja con ☢, al final).
+  - En "Solo simular" el botón está deshabilitado. En "Practicar" actúa solo sobre la copia de prueba.
+  - Primera confirmación: qué se va, con cantidades (PDF y carpetas de proveedores, `_Entrada`, filas de la planilla, cada carpeta o archivo), qué queda, el tamaño del zip y el aviso de que el OneDrive se sincroniza con otras personas.
+  - Segunda confirmación: escribir BORRAR TODO exacto; el botón se habilita recién a los 5 segundos.
+  - Después aparecen **Deshacer el borrado total** y **Vaciar definitivamente…**, con la fecha, el estado, las carpetas `_Borrado` y el zip.
+  - Todo corre con `con_espera` y `de_a_uno`, y los botones usan `mientras_libre`. Las funciones de `borrado.py` vuelven a revisar el modo.
+- `APPFACTURAS_DOCUMENTOS` cambia la carpeta del zip. Es solo para una instalación de juguete: no cambies `USERPROFILE`, porque Excel arranca con un perfil vacío y se cuelga en la pantalla de primer inicio.
 
 - **Lista cerrada.** Nunca se recorre la raíz del OneDrive para decidir qué se lleva. Solo se llevan estos nombres fijos:
   - en la raíz del OneDrive: `Facturas pendientes\` entero, `PROVEEDORES RUA.xlsx` y los `DEUDA A PAGAR ARG - respaldo *.xlsx`;
@@ -191,6 +199,8 @@ Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <
   - La planilla vuelve de la copia solo si nadie la cambió desde el borrado (SHA256) y está cerrada en Excel.
   - El `proveedores.csv` vacío del Setup se saca si sigue igual.
 - **Vaciar definitivamente** (`borrado.vaciar`): hay que escribir VACIAR. Manda a la papelera de Windows (`SHFileOperation` con deshacer) solo las carpetas `_Borrado …` del registro que están justo en la raíz del OneDrive o de la app. Lo del OneDrive va además a la papelera de OneDrive. Nunca usa `rmtree`.
+  - Si alguna ruta tiene 260 caracteres o más, no vacía nada y avisa. La papelera no acepta esas rutas, y Windows ofrecería borrarlas para siempre.
+  - Si igual aparece ese cartel de Windows, contestá No: la app avisa "No pude vaciar" y todo sigue en `_Borrado`.
 
 ## Reglas de negocio
 

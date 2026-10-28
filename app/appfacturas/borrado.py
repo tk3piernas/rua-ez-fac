@@ -32,6 +32,7 @@ PREFIJO = "_Borrado "
 ACTIVOS = ("en curso", "hecho", "deshecho a medias")        # a record in these states blocks a new 'Borrar todo'
 QUEDAN_EN_DATOS = ("recorrido.json", "borrado.json", "borrado.tmp")   # + app.log* (open while the app runs)
 SOLO_NUBE = 0x00400000 | 0x00040000 | 0x00001000           # RECALL_ON_DATA_ACCESS, RECALL_ON_OPEN, OFFLINE
+MAX_PAPELERA = 260                                          # MAX_PATH: longer paths do not fit in the recycle bin
 
 
 class BorradoError(Exception):
@@ -45,6 +46,9 @@ def _registro(modo: str) -> Path:
 
 
 def carpeta_respaldo_zip() -> Path:
+    """%USERPROFILE%\\Documents (APPFACTURAS_DOCUMENTOS only for a sandbox install)."""
+    if os.environ.get("APPFACTURAS_DOCUMENTOS"):
+        return Path(os.environ["APPFACTURAS_DOCUMENTOS"])
     return Path(os.environ.get("USERPROFILE") or Path.home()) / "Documents"
 
 
@@ -341,7 +345,8 @@ def borrar(cfg, modo: str, carpeta_zip: Path | None = None, log=print) -> dict:
         raise BorradoError("No borré nada:\n- " + "\n- ".join(problemas))
     raiz, pl, app = inv["raiz"], inv["planilla"], inv["app"]
     marca = f"{datetime.now():%Y-%m-%d %H%M}"
-    if (raiz / (PREFIJO + marca)).exists() or (app / (PREFIJO + marca)).exists():
+    if (raiz / (PREFIJO + marca)).exists() or (app / (PREFIJO + marca)).exists() \
+            or any(carpeta_zip.glob(f"Respaldo RUA EZ-Fac {marca} *")):
         marca = f"{datetime.now():%Y-%m-%d %H%M%S}"
     zip_ = _respaldo_zip(inv, carpeta_zip, marca, log)
     b_od, b_app = raiz / (PREFIJO + marca), app / (PREFIJO + marca)
@@ -508,7 +513,9 @@ def deshacer(cfg, modo: str, log=print) -> dict:
 
 def _a_la_papelera(p: Path) -> None:
     """Windows recycle bin (OneDrive sends it to its own recycle bin). Never rmtree."""
+    import pythoncom
     from win32com.shell import shell, shellcon
+    pythoncom.CoInitialize()                         # it runs in a worker thread
     flags = shellcon.FOF_ALLOWUNDO | shellcon.FOF_NOCONFIRMATION | shellcon.FOF_WANTNUKEWARNING
     res, abortado = shell.SHFileOperation((0, shellcon.FO_DELETE, str(p), None, flags, None, None))
     if res or abortado:
@@ -525,11 +532,16 @@ def vaciar(cfg, modo: str, confirmacion: str, log=print) -> dict:
     if not reg or reg.get("estado") not in ("hecho", "deshecho a medias"):
         raise BorradoError("no hay carpetas de 'Borrar todo' para vaciar")
     padres = {str(Path(reg["raiz"])), str(Path(reg["app"]))}
-    for c in map(Path, reg["carpetas"]):
-        if not c.exists():
-            continue
+    carpetas = [c for c in map(Path, reg["carpetas"]) if c.exists()]
+    for c in carpetas:
         if not c.name.startswith(PREFIJO) or str(c.parent) not in padres or _es_link(c):
             raise BorradoError(f"{c} no es una carpeta de 'Borrar todo'; no la toco")
+    # Windows can not recycle a path of MAX_PATH or more: it would offer to delete it for good instead
+    largas = [f for c in carpetas for f in [c, *c.rglob("*")] if len(str(f)) >= MAX_PAPELERA]
+    if largas:
+        raise BorradoError(f"{len(largas)} archivos tienen la ruta demasiado larga para la papelera de Windows "
+                           f"(por ejemplo {largas[0]}). No vacié nada: todo sigue en _Borrado.")
+    for c in carpetas:
         _a_la_papelera(c)
         if c.exists():
             raise BorradoError(f"{c} sigue ahí después de mandarla a la papelera")

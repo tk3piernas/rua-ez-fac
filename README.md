@@ -81,6 +81,20 @@ Arriba, al lado del nombre de la app: si hay facturas esperando aparece **N para
 
 **Configuración → Reset de la planilla…** (hay que escribir BORRAR). Vacía las filas 12–210 de las hojas de cada área en el mismo archivo, así los links compartidos siguen andando: vuelve a poner la fórmula del IVA, no toca la columna I ni el formato, y si querés también vacía Proveedores. Antes guarda dos respaldos (uno en la carpeta `Respaldos`, al lado de la planilla). Mientras nadie toque la planilla, **Volver al respaldo del reset** la deja como estaba.
 
+## Borrar todo
+
+**Configuración → Zona de peligro (☢) → Borrar todo** deja la app como recién empezada:
+- **Qué se lleva:** las facturas guardadas, `_Entrada`, `proveedores.csv`, las planillas exportadas, los respaldos, `PROVEEDORES RUA.xlsx` y los datos de la app.
+- **La planilla:** vacía todas sus hojas en el mismo archivo.
+- **Qué no se lleva:** no toca `config.toml`, la clave de Claude ni nada más del OneDrive.
+- **Cómo:** no borra. Mueve todo a una carpeta `_Borrado <fecha>` y antes guarda un zip de respaldo en Documentos.
+- **Dónde actúa:** en *Practicar* solo sobre la copia de prueba; en *Solo simular* no se puede.
+- **Confirmación:** primero te muestra qué se va, con cantidades. Después hay que escribir BORRAR TODO, y el botón se habilita a los 5 segundos.
+
+Después del borrado aparecen dos botones:
+- **Deshacer el borrado total** devuelve cada cosa a su lugar. Nunca pisa lo que haya aparecido después con el mismo nombre.
+- **Vaciar definitivamente** (hay que escribir VACIAR) manda las carpetas `_Borrado` a la papelera de Windows.
+
 ## Actualizar
 
 - Lo más fácil: la misma línea de PowerShell de **Instalar**.

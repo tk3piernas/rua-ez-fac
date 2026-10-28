@@ -267,3 +267,25 @@ def test_link_adentro_frena(tmp_path, monkeypatch):
     with pytest.raises(borrado.BorradoError, match="link"):
         borrado.inventario(cfg, "real")
     assert (afuera / "importante.txt").is_file()
+
+
+def test_dos_veces_en_el_mismo_minuto(tmp_path, monkeypatch):
+    """Borrar, deshacer y borrar otra vez enseguida: the second zip and _Borrado get their own names."""
+    raiz, app, cfg, docs = _real(tmp_path, monkeypatch)
+    primero = borrado.borrar(cfg, "real", carpeta_zip=docs, log=lambda s: None)
+    borrado.deshacer(cfg, "real", log=lambda s: None)
+    segundo = borrado.borrar(cfg, "real", carpeta_zip=docs, log=lambda s: None)
+    assert segundo["estado"] == "hecho" and segundo["zip"] != primero["zip"]
+    assert len(list(docs.iterdir())) == 2
+
+
+def test_vaciar_no_sigue_con_rutas_largas(tmp_path, monkeypatch):
+    """A path too long for the recycle bin: Windows would offer to delete it for good, so nothing is emptied."""
+    raiz, app, cfg, docs = _real(tmp_path, monkeypatch)
+    borrado.borrar(cfg, "real", carpeta_zip=docs, log=lambda s: None)
+    papelera = []
+    monkeypatch.setattr(borrado, "_a_la_papelera", papelera.append)
+    monkeypatch.setattr(borrado, "MAX_PAPELERA", 40)
+    with pytest.raises(borrado.BorradoError, match="demasiado larga"):
+        borrado.vaciar(cfg, "real", "VACIAR", log=lambda s: None)
+    assert papelera == [] and borrado.estado("real")["estado"] == "hecho"

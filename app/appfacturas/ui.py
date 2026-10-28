@@ -32,6 +32,10 @@ body { background: linear-gradient(180deg, #e9ebf7 0px, #f6f7fc 320px) fixed; co
 .chip-icono { width: 38px; height: 38px; border-radius: 12px; background: rgba(255,84,44,.12); color: var(--naranja);
               display: flex; align-items: center; justify-content: center; }
 .titulo-seccion { font-size: 1.12rem; font-weight: 700; color: var(--navy); }
+.zona-peligro { border: 2px solid #dc2626; background: #fef2f2; }
+.zona-peligro::before { background: #dc2626; }
+.zona-peligro .chip-icono { background: rgba(220,38,38,.15); color: #dc2626; font-size: 1.6rem; }
+.zona-peligro .titulo-seccion { color: #b91c1c; }
 .tarjeta { min-width: 160px; border-radius: 14px; background: linear-gradient(180deg, #fff, #f5f6fc);
            border: 1px solid var(--linea); box-shadow: none !important; padding: 12px 18px; }
 .tarjeta .titulo { font-size: .75rem; color: #6b7088; text-transform: uppercase; letter-spacing: .4px; }
@@ -64,14 +68,18 @@ body { background: linear-gradient(180deg, #e9ebf7 0px, #f6f7fc 320px) fixed; co
 """
 
 
-def seccion(titulo: str, icono: str | None = None, ancho: str = "w-full"):
-    """A white card with a coloured top line and its title centered: each area of the screen is one of these."""
+def seccion(titulo: str, icono: str | None = None, ancho: str = "w-full", simbolo: str = ""):
+    """A white card with a coloured top line and its title centered: each area of the screen is one of these.
+    `simbolo`: a character instead of an icon (the ☢ of the danger zone)."""
     c = ui.card().classes(f"seccion {ancho} items-center gap-3 p-6")
     with c:
         with ui.row().classes("w-full justify-center items-center gap-3"):
-            if icono:
+            if icono or simbolo:
                 with ui.element("div").classes("chip-icono"):
-                    ui.icon(icono).classes("text-2xl")
+                    if icono:
+                        ui.icon(icono).classes("text-2xl")
+                    else:
+                        ui.label(simbolo)
             ui.label(titulo).classes("titulo-seccion")
         ui.separator().classes("w-full opacity-60")
     return c
@@ -1545,6 +1553,7 @@ def panel_config(refrescar_modo):
                 panel_historial.refresh()            # the round and its buttons depend on the workbook
                 refrescar_modo()
                 selector.refresh()
+                zona_peligro.refresh()
                 ui.notify(f"Modo: {MODOS[modo][0]}")
 
             @ui.refreshable
@@ -1608,6 +1617,8 @@ def panel_config(refrescar_modo):
                 S.cfg = cfg_activa()
             ui.switch("Escribir el servicio de la factura en la columna C", value=cfg_real.escribir_servicio,
                       on_change=cambiar_servicio)
+
+        zona_peligro()
 
 
 def mostrar_chequeo(lineas: list[str]) -> None:
@@ -1768,6 +1779,239 @@ async def dialogo_reset():
     S.lote = None
     panel_revision.refresh()
     volver_reset_boton.refresh()
+
+
+# ------------------------------------------------------------------ Borrar todo (Zona de peligro)
+
+def _modo_borrado() -> str:
+    return "prueba" if S.usar_prueba else "real"
+
+
+def _fecha_corta(iso: str) -> str:
+    return iso.replace("T", " ")[:16]
+
+
+@ui.refreshable
+def zona_peligro():
+    from . import borrado
+    from .carpeta_prueba import carpeta_prueba
+    modo = _modo_borrado()
+    reg = borrado.estado(modo)
+    with seccion("Zona de peligro", None, "w-[760px] zona-peligro", simbolo="☢").props("data-tour=zona-peligro"):
+        ui.label("Borrar todo deja la app como recién empezada: se lleva las facturas guardadas, _Entrada, "
+                 "proveedores.csv, las planillas exportadas, los respaldos y PROVEEDORES RUA.xlsx, y vacía todas "
+                 "las hojas de la planilla (Proveedores incluida). No borra: mueve todo a una carpeta "
+                 "\"_Borrado <fecha>\" y se puede deshacer. Antes guarda un zip de respaldo en Documentos.").classes(
+            "text-sm text-gray-700 text-center")
+        ui.label(f"COPIA DE PRUEBA: {carpeta_prueba()}" if modo == "prueba" else
+                 "LO REAL: el OneDrive de RUA y la planilla real" if puede_escribir(S.cfg) else
+                 "En 'Solo simular' no se puede: elegí Practicar o Cargar en la planilla real").classes(
+            "text-xs text-center ruta " + ("chequeo-ok" if modo == "prueba" else "chequeo-falta"))
+        if reg and reg.get("estado") in borrado.ACTIVOS:
+            ui.label(f"Hay un Borrar todo del {_fecha_corta(reg['fecha'])} ({reg['estado']}). Lo movido está en: "
+                     + " · ".join(reg["carpetas"])).classes("text-sm text-center ruta")
+            ui.label(f"Respaldo: {reg['zip']}").classes("text-xs text-gray-500 text-center ruta")
+            for a in reg.get("avisos", [])[:10]:
+                ui.label(f"• {a}").classes("text-xs text-amber-700")
+            with ui.row().classes("justify-center gap-3"):
+                mientras_libre(ui.button("Deshacer el borrado total", icon="undo", on_click=deshacer_borrado).props(
+                    "outline"), puede_escribir(S.cfg), SOLO_SIMULAR)
+                mientras_libre(ui.button("Vaciar definitivamente…", icon="delete_forever",
+                                         on_click=vaciar_borrado).props("color=negative outline"),
+                               puede_escribir(S.cfg), SOLO_SIMULAR)
+        else:
+            if reg and reg.get("estado") in ("deshecho", "vaciado", "revertido"):
+                ui.label(f"Último Borrar todo: {_fecha_corta(reg['fecha'])}, {reg['estado']}.").classes(
+                    "text-xs text-gray-500 text-center")
+            mientras_libre(ui.button("Borrar todo", icon="dangerous", on_click=dialogo_borrar_todo).props(
+                "color=negative unelevated"), puede_escribir(S.cfg), SOLO_SIMULAR)
+
+
+def _lista(titulo: str, lineas: list[str], clase: str = "") -> None:
+    ui.label(titulo).classes("font-bold text-sm self-start")
+    with ui.column().classes("gap-0 self-start"):
+        for l in lineas:
+            ui.label(f"• {l}").classes(f"text-sm {clase}")
+
+
+def que_se_va(inv: dict) -> list[str]:
+    """The lines of the first confirmation: counts first, then each thing that moves."""
+    from .util import relativa
+    filas = inv["filas"]
+    out = [f"{inv['pdf']} PDF en {inv['carpetas_proveedores']} carpetas de proveedores",
+           f"{inv['en_entrada']} archivos en _Entrada (con _Duplicados y _Procesados)",
+           f"{sum(filas.values())} filas en la planilla (" + ", ".join(f"{a} {n}" for a, n in filas.items())
+           + f") y {inv['proveedores']} en Proveedores: se vacía el mismo archivo, sin tocar la columna I ni el formato"]
+    for it in inv["items"]:
+        base = inv["raiz"] if it["donde"] == "onedrive" else inv["app"]
+        lugar = "OneDrive" if it["donde"] == "onedrive" else "app"
+        out.append(f"{lugar}: {relativa(it['ruta'], base)}" + (f" ({it['archivos']} archivos)" if it["carpeta"] else ""))
+    return out
+
+
+@de_a_uno
+async def dialogo_borrar_todo():
+    from . import borrado
+    cfg, modo = S.cfg, _modo_borrado()
+    if not puede_escribir(cfg):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
+    try:
+        inv = await con_espera("Revisando qué se va…", borrado.inventario, cfg, modo)
+        problemas = await con_espera("Revisando que nada esté abierto…", borrado.chequeo_previo, cfg, inv,
+                                     borrado.carpeta_respaldo_zip())
+    except Exception as ex:
+        ui.notify(f"No borré nada: {ex}", type="negative", multi_line=True, timeout=0, close_button=True)
+        return
+    if problemas:
+        with ui.dialog() as dlg0, ui.card().classes("seccion w-[680px] max-w-full gap-3 p-6"):
+            ui.label("No borré nada").classes("titulo-seccion self-center")
+            _lista("Primero hay que resolver esto:", problemas, "text-red-700 ruta")
+            ui.button("Entendido", on_click=dlg0.close).props("flat").classes("self-center")
+        dlg0.open()
+        return
+
+    # first confirmation: exactly what goes and what stays
+    real = modo == "real"
+    with ui.dialog().props("persistent") as dlg, \
+            ui.card().classes("seccion zona-peligro w-[720px] max-w-full gap-3 p-6"):
+        ui.label("☢ Borrar todo").classes("titulo-seccion self-center")
+        ui.label(("LO REAL: " if real else "COPIA DE PRUEBA: ") + str(inv["raiz"])).classes(
+            "text-xs text-center ruta self-center " + ("chequeo-falta" if real else "chequeo-ok"))
+        _lista("Se va (se mueve a _Borrado y se puede deshacer):", que_se_va(inv))
+        queda = ["config.toml, la clave de Claude y el recorrido ya visto",
+                 "todo lo demás del OneDrive (escritorio, imágenes, otras planillas y carpetas)"]
+        if not real:
+            queda.append("datos\\ de la app (lotes, historial): en Practicar no se tocan")
+        queda += [f"{p.parent.name}\\{p.name} (no es de la app)" for p in inv["quedan"]]
+        _lista("Queda:", queda)
+        ui.label(f"Antes guardo un zip de respaldo en {borrado.carpeta_respaldo_zip()} "
+                 f"({inv['bytes'] // 2**20 + 1} MB).").classes("text-sm ruta")
+        if inv["solo_nube"]:
+            ui.label(f"Hay {inv['solo_nube']} archivos que están solo en la nube: para el respaldo se van a bajar."
+                     ).classes("text-sm text-amber-700")
+        if real:
+            ui.label("Ojo: el OneDrive se sincroniza con otras personas de RUA. Lo que se mueve también "
+                     "desaparece de su lugar para ellas.").classes("text-sm font-bold text-red-700")
+        with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
+            ui.button("Sigo", on_click=lambda: dlg.submit(True)).props("color=negative outline")
+            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+    if not await dlg:
+        return
+
+    # second confirmation: type BORRAR TODO; the button wakes up after 5 seconds
+    espera = {"s": 5}
+    with ui.dialog().props("persistent") as dlg2, \
+            ui.card().classes("seccion zona-peligro w-[560px] max-w-full items-center gap-3 p-6"):
+        ui.label("☢ Última confirmación").classes("titulo-seccion")
+        ui.label("Escribí BORRAR TODO, en mayúsculas, para confirmar.").classes("text-sm text-center")
+        conf = ui.input("BORRAR TODO").classes("w-64")
+        with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
+            ok_btn = ui.button("Borrar todo (5)", icon="dangerous", on_click=lambda: dlg2.submit(True)).props(
+                "color=negative unelevated")
+            ui.button("Cancelar", on_click=lambda: dlg2.submit(False)).props("flat")
+        ok_btn.disable()
+
+        def revisar():
+            ok_btn.text = "Borrar todo" + (f" ({espera['s']})" if espera["s"] > 0 else "")
+            if espera["s"] <= 0 and (conf.value or "") == "BORRAR TODO":
+                ok_btn.enable()
+            else:
+                ok_btn.disable()
+
+        def tic():
+            espera["s"] -= 1
+            revisar()
+            if espera["s"] <= 0:
+                reloj.deactivate()
+        reloj = ui.timer(1.0, tic)
+        conf.on_value_change(lambda e: revisar())
+    if not await dlg2 or (conf.value or "") != "BORRAR TODO" or espera["s"] > 0:
+        return
+    try:
+        reg = await con_espera("Borrando todo: respaldo, mover a _Borrado y vaciar la planilla…",
+                               borrado.borrar, cfg, modo, None, print)
+    except Exception as ex:
+        ui.notify(str(ex), type="negative", multi_line=True, timeout=0, close_button=True)
+        zona_peligro.refresh()
+        return
+    ui.notify("Listo: todo quedó en " + " y ".join(reg["carpetas"]) + f". Respaldo: {reg['zip']}"
+              + "".join(f"\n• {a}" for a in reg["avisos"]), type="positive", multi_line=True, timeout=0,
+              close_button=True)
+    _despues_de_borrado()
+
+
+def _despues_de_borrado():
+    S.lote = None
+    panel_revision.refresh()
+    panel_proveedores.refresh()
+    panel_historial.refresh()
+    volver_reset_boton.refresh()
+    zona_peligro.refresh()
+
+
+@de_a_uno
+async def deshacer_borrado():
+    from . import borrado
+    cfg, modo = S.cfg, _modo_borrado()
+    if not puede_escribir(cfg):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
+    with ui.dialog() as dlg, ui.card().classes("items-center"):
+        ui.label("¿Devuelvo todo a su lugar?").classes("font-bold")
+        ui.label("Lo que apareció después con el mismo nombre no se pisa: queda en _Borrado y te aviso. "
+                 "La planilla vuelve solo si nadie la cambió y está cerrada en Excel.").classes("text-sm text-center")
+        with ui.row().classes("justify-center"):
+            ui.button("Sí, deshacer", on_click=lambda: dlg.submit(True)).props("color=primary")
+            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+    if not await dlg:
+        return
+    try:
+        reg = await con_espera("Devolviendo todo a su lugar…", borrado.deshacer, cfg, modo, print)
+    except Exception as ex:
+        ui.notify(f"No pude deshacer: {ex}", type="negative", multi_line=True, timeout=0, close_button=True)
+        return
+    bien = reg["estado"] == "deshecho"
+    ui.notify(("Listo: todo volvió a su lugar." if bien else "Volvió casi todo; lo que no, quedó en _Borrado:")
+              + "".join(f"\n• {a}" for a in reg["avisos"]), type="positive" if bien else "warning",
+              multi_line=True, timeout=0, close_button=True)
+    _despues_de_borrado()
+
+
+@de_a_uno
+async def vaciar_borrado():
+    from . import borrado
+    cfg, modo = S.cfg, _modo_borrado()
+    if not puede_escribir(cfg):
+        ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
+        return
+    reg = borrado.estado(modo) or {}
+    with ui.dialog().props("persistent") as dlg, \
+            ui.card().classes("seccion zona-peligro w-[620px] max-w-full items-center gap-3 p-6"):
+        ui.label("Vaciar definitivamente").classes("titulo-seccion")
+        ui.label("Manda a la papelera de Windows estas carpetas (lo del OneDrive va también a la papelera de "
+                 "OneDrive). Después ya no se puede deshacer desde la app; queda el zip de respaldo.").classes(
+            "text-sm text-center")
+        for c in reg.get("carpetas", []):
+            ui.label(c).classes("text-xs ruta")
+        ui.label(f"Respaldo: {reg.get('zip', '')}").classes("text-xs text-gray-500 ruta")
+        conf = ui.input("Escribí VACIAR para confirmar").classes("w-64")
+        with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
+            ok_btn = ui.button("Vaciar", icon="delete_forever", on_click=lambda: dlg.submit(True)).props(
+                "color=negative unelevated")
+            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+        ok_btn.disable()
+        conf.on_value_change(lambda e: ok_btn.enable() if (e.value or "") == "VACIAR" else ok_btn.disable())
+    if not await dlg:
+        return
+    try:
+        await con_espera("Mandando a la papelera…", borrado.vaciar, cfg, modo, conf.value or "", print)
+    except Exception as ex:
+        ui.notify(f"No pude vaciar: {ex}", type="negative", multi_line=True, timeout=0, close_button=True)
+        zona_peligro.refresh()
+        return
+    ui.notify("Listo: las carpetas _Borrado están en la papelera.", type="positive")
+    zona_peligro.refresh()
 
 
 # ------------------------------------------------------------------ start

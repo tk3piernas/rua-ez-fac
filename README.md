@@ -44,6 +44,10 @@ Pestaña **Proveedores**: pegá los datos como vengan (mail, WhatsApp, .txt) y t
 
 En **Configuración → Modo de trabajo** elegís uno de tres: *Solo simular* (lee y muestra qué haría, sin tocar nada; así arranca la primera vez), *Practicar en la carpeta de prueba* (trabaja de verdad sobre una copia; nunca escribe en la planilla real, aunque la tengas abierta en Excel) o *Cargar en la planilla real*.
 
+## Cerrar una tanda de pagos
+
+En **Historial → Tanda de pagos**, *Cerrar la tanda N…* guarda una copia de la planilla como `DEUDA A PAGAR ARG tanda N`, anota qué lotes entraron y, si querés, la deja vacía para la próxima. Se puede deshacer mientras nadie la toque.
+
 ## Revisar la planilla
 
 Pestaña **Revisar**: compara la planilla con las carpetas y te dice qué mirar (links rotos, filas repetidas o sin link, PDF que no están en ninguna fila, proveedores sin datos de pago, archivos viejos en `_Entrada`). Solo lee, no cambia nada.

@@ -776,8 +776,11 @@ async def deshacer(trabajo: Path):
 
 @ui.refreshable
 def panel_historial():
+    from . import tandas
     d = datos() / "lotes"
     lotes = sorted((x for x in d.iterdir() if x.is_dir()), reverse=True) if d.exists() else []
+    panel_tandas()
+    n_tanda = tandas.tanda_de(datos())
     with seccion("Lotes anteriores", "history", "w-[760px]"):
         if not lotes:
             ui.label("Todavía no hay lotes.").classes("text-gray-500")
@@ -787,9 +790,11 @@ def panel_historial():
         for x in lotes[:40]:
             e = ejecutor.estado(x)
             modo = ejecutor.donde(x)[0] if e.get("estado") else ""
-            filas.append({"lote": fecha_lote(x.name), "estado": ejecutor.etiqueta(x), "donde": modo.upper(),
+            filas.append({"lote": fecha_lote(x.name), "tanda": n_tanda.get(x.name, ""),
+                          "estado": ejecutor.etiqueta(x), "donde": modo.upper(),
                           "planilla": e.get("excel", ""), "errores": len(e.get("errores", []))})
         ui.aggrid({"columnDefs": [{"field": "lote", "headerName": "Fecha", "width": 160},
+                                  {"field": "tanda", "headerName": "Tanda", "width": 80},
                                   {"field": "estado", "headerName": "Estado", "width": 200},
                                   {"field": "donde", "headerName": "Dónde", "width": 100},
                                   {"field": "planilla", "headerName": "Planilla", "width": 150},
@@ -805,6 +810,96 @@ def panel_historial():
                                              on_click=lambda: continuar(ultimo)).props("outline"))
                 mientras_libre(ui.button(f"Deshacer el último lote ({ultimo.name}, {ejecutor.donde(ultimo)[0].upper() or '?'})",
                                          icon="undo", on_click=lambda: deshacer(ultimo)).props("color=negative outline"))
+
+
+def panel_tandas():
+    """Close the current round: export it as 'tanda N', note its batches and, optionally, empty the workbook."""
+    from . import tandas
+    cfg = S.cfg
+    with seccion("Tanda de pagos", "inventory_2", "w-[760px]"):
+        if not cfg or not cfg.planilla:
+            ui.label("No sé cuál es la planilla.").classes("text-gray-500")
+            return
+        n = tandas.siguiente(datos(), cfg.planilla)
+        abiertos = tandas.lotes_abiertos(datos(), cfg.planilla)
+        ui.label(f"Tanda actual: {n} · {len(abiertos)} lotes cargados desde el último cierre "
+                 f"({'COPIA de prueba' if S.usar_prueba else 'planilla REAL'})").classes("text-sm text-center")
+        ui.label("Cerrar la tanda guarda una copia de la planilla como 'DEUDA A PAGAR ARG tanda N' en Planillas "
+                 "exportadas, anota qué lotes entraron y, si querés, deja la planilla vacía para la próxima.").classes(
+            "text-xs text-gray-500 text-center")
+        with ui.row().classes("justify-center gap-3"):
+            b = mientras_libre(ui.button(f"Cerrar la tanda {n}…", icon="inventory_2", on_click=cerrar_tanda).props(
+                "color=secondary unelevated"))
+            if not puede_escribir(cfg):
+                b.disable()
+                b.tooltip("Estás en 'Solo simular': cambiá el modo en Configuración")
+            u = tandas.ultima(datos(), cfg.planilla)
+            if u:
+                mientras_libre(ui.button(f"Deshacer el cierre de la tanda {u['n']}", icon="undo",
+                                         on_click=deshacer_tanda).props("color=negative outline"))
+
+
+@de_a_uno
+async def cerrar_tanda():
+    from . import tandas
+    cfg = S.cfg
+    n = tandas.siguiente(datos(), cfg.planilla)
+    with ui.dialog() as dlg, ui.card().classes("seccion w-[620px] max-w-full items-center gap-3 p-6"):
+        ui.label(f"Cerrar la tanda {n}").classes("titulo-seccion")
+        ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {cfg.planilla}").classes(
+            "text-xs text-center break-all " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
+        nombre = ui.input("Nombre de la copia", value=f"DEUDA A PAGAR ARG tanda {n}").classes("w-96")
+        vaciar = ui.checkbox("Además dejar la planilla vacía para la próxima tanda (reset)")
+        conf = ui.input("Para vaciarla, escribí BORRAR").classes("w-64")
+        conf.bind_visibility_from(vaciar, "value")
+        ui.label("Se puede deshacer desde acá mientras nadie toque la planilla ni la copia.").classes(
+            "text-xs text-gray-500 text-center")
+        with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
+            ui.button("Cerrar la tanda", icon="inventory_2", on_click=lambda: dlg.submit(True)).props(
+                "color=secondary unelevated")
+            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+    if not await dlg:
+        return
+    if vaciar.value and (conf.value or "").strip().upper() != "BORRAR":
+        ui.notify("Para vaciar la planilla hay que escribir BORRAR. No hice nada.", type="warning")
+        return
+    try:
+        t = await con_espera("Cerrando la tanda…", tandas.cerrar, cfg, datos(), nombre.value, bool(vaciar.value),
+                             lambda s: None)
+    except Exception as ex:
+        ui.notify(f"No pude cerrar la tanda: {ex}", type="negative", multi_line=True)
+        panel_historial.refresh()
+        return
+    ui.notify(f"Tanda {t['n']} cerrada: {Path(t['exportada']).name}, {len(t['lotes'])} lotes"
+              + (", planilla vacía" if t.get("vaciada") else ""), type="positive", multi_line=True)
+    S.lote = None
+    panel_revision.refresh()
+    panel_historial.refresh()
+    volver_reset_boton.refresh()
+
+
+@de_a_uno
+async def deshacer_tanda():
+    from . import tandas
+    u = tandas.ultima(datos(), S.cfg.planilla)
+    with ui.dialog() as dlg, ui.card().classes("items-center"):
+        ui.label(f"¿Deshago el cierre de la tanda {u['n']}?").classes("font-bold")
+        ui.label(("La planilla vuelve a como estaba antes de vaciarla (tiene que estar cerrada en Excel) y "
+                  if u.get("vaciada") else "") + "se borra la copia exportada si nadie la tocó.").classes("text-sm text-center")
+        with ui.row().classes("justify-center"):
+            ui.button("Sí, deshacer", on_click=lambda: dlg.submit(True)).props("color=negative")
+            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+    if not await dlg:
+        return
+    try:
+        problemas = await con_espera("Deshaciendo el cierre…", tandas.deshacer, S.cfg, datos(), lambda s: None)
+    except Exception as ex:
+        ui.notify(f"No pude deshacer (no se cambió nada): {ex}", type="negative", multi_line=True)
+        return
+    ui.notify("Cierre deshecho" + (": " + "; ".join(problemas) if problemas else ""),
+              type="warning" if problemas else "positive", multi_line=True)
+    panel_historial.refresh()
+    volver_reset_boton.refresh()
 
 
 # ------------------------------------------------------------------ Revisar (audit, read only)
@@ -1126,6 +1221,7 @@ def panel_config(refrescar_modo):
                 S.lote = None
                 panel_revision.refresh()
                 panel_proveedores.refresh()          # its memory file depends on the mode
+                panel_historial.refresh()            # the round and its buttons depend on the workbook
                 refrescar_modo()
                 selector.refresh()
                 ui.notify(f"Modo: {MODOS[modo][0]}")

@@ -265,17 +265,22 @@ def respaldo(planilla: Path, backups: Path, motivo: str) -> list[Path]:
     return [junto, local]
 
 
-def reset_planilla(cfg, backups: Path, vaciar_proveedores: bool = False, log=print) -> dict:
+def reset_planilla(cfg, backups: Path, vaciar_proveedores: bool = False, log=print, solo_local: bool = False) -> dict:
     """Empties the workbook IN PLACE (same file, so the OneDrive sharing links keep working):
     A-G and J of rows 12-210 (values, fills, comments, links) and H back to its formula. I is never touched.
-    Optionally empties Proveedores A5:O300. Returns what was done (with the backups)."""
+    Optionally empties Proveedores A5:O300. Returns what was done (with the backups).
+    `solo_local`: only the copy in datos\backups (closing a batch round already left an exported copy in OneDrive)."""
     if not cfg.planilla or not Path(cfg.planilla).is_file():
         raise ExcelError(f"no encuentro la planilla ({cfg.planilla})")
     libro = abrir(cfg)
     try:
         if not libro.saved:
             raise ExcelError("la planilla está abierta con cambios sin guardar: guardala o cerrala y volvé a probar")
-        copias = respaldo_reset(Path(cfg.planilla), backups)
+        if solo_local:
+            local = respaldar(Path(cfg.planilla), backups, "antes del reset")
+            copias = [local, local]
+        else:
+            copias = respaldo_reset(Path(cfg.planilla), backups)
         filas = {}
         nombres = libro.nombres()
         for area in (a for a in AREAS if a in nombres):
@@ -294,7 +299,7 @@ def reset_planilla(cfg, backups: Path, vaciar_proveedores: bool = False, log=pri
     finally:
         libro.cerrar()
     _anotar_reset(Path(cfg.planilla), backups, copias)
-    return {"filas": filas, "proveedores": provs, "respaldos": [str(c) for c in copias]}
+    return {"filas": filas, "proveedores": provs, "respaldos": [str(c) for c in dict.fromkeys(copias)]}
 
 
 def _archivo_reset(backups: Path) -> Path:

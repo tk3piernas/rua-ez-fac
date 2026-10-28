@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.11.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.12.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -90,7 +90,9 @@ Estructura de la carpeta de la app:
    - Secciones de lo que no se carga, los proveedores nuevos y los archivos que se mueven.
    - Botones Confirmar y Copiar al portapapeles. Si no hay avisos para revisar ni que frenen y nada excluido, Confirmar carga directo (sin el "¿Confirmo?"); si hay, pregunta.
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
-4. **Historial:** los lotes anteriores, con la fecha legible (28/10/2026 10:41), la columna **Dónde** (PRUEBA o REAL) y el estado. Un lote que quedó "en curso" porque se cerró la app a mitad aparece como **quedó a medias**. Para el último lote: **Terminar este lote** (si quedó a medias o con cosas pendientes) y **Deshacer**, que dice sobre qué planilla actúa.
+4. **Historial:**
+   - **Tanda de pagos:** dice en qué tanda está la planilla activa y cuántos lotes se cargaron desde el último cierre. **Cerrar la tanda N…** guarda una copia como `DEUDA A PAGAR ARG tanda N` (o el nombre que elijas) en `Planillas exportadas`, anota en `datos	andas.json` qué lotes entraron y, si tildás "dejar la planilla vacía" y escribís BORRAR, hace el reset con un solo respaldo en `datosackups` (la copia exportada ya queda en OneDrive). **Deshacer el cierre** vuelve la planilla a como estaba (si nadie la tocó y está cerrada en Excel) y borra la copia si nadie la cambió. Cada planilla (real o copia de prueba) lleva su propia numeración.
+   - Los lotes anteriores, con la columna **Tanda**, la fecha legible (28/10/2026 10:41), la columna **Dónde** (PRUEBA o REAL) y el estado. Un lote que quedó "en curso" porque se cerró la app a mitad aparece como **quedó a medias**. Para el último lote: **Terminar este lote** (si quedó a medias o con cosas pendientes) y **Deshacer**, que dice sobre qué planilla actúa.
 5. **Revisar** (auditoría, solo lee; también `python -m appfacturas revisar`): compara la planilla activa con las carpetas y lista, con un OK o la cantidad:
    - links de J que apuntan a un PDF que ya no está;
    - filas repetidas (mismo link, o mismo proveedor con el mismo texto en J);
@@ -237,5 +239,5 @@ Estructura de la carpeta de la app:
 
 - Primera corrida real: Matheo elige "Cargar en la planilla real".
 - Modos con Claude: A (API, clave en el Administrador de credenciales de Windows) y B (Cowork, `_Revisar con Claude\<lote>\`).
-- Cierre de tanda (G2) y aviso de "N para leer" en el encabezado (G5).
+- Aviso de "N para leer" en el encabezado (G5).
 - Retirar el PS1.

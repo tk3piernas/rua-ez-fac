@@ -342,6 +342,7 @@ def pagina():
             t_rev = ui.tab("Revisión", icon="fact_check")
             t_res = ui.tab("Resultado", icon="task_alt")
             t_hist = ui.tab("Historial", icon="history")
+            t_revisar = ui.tab("Revisar", icon="rule")
             t_prov = ui.tab("Proveedores", icon="contacts")
             t_conf = ui.tab("Configuración", icon="settings")
         with ui.tab_panels(tabs, value=t_cargar).classes("w-full bg-transparent"):
@@ -353,6 +354,8 @@ def pagina():
                 panel_resultado()
             with ui.tab_panel(t_hist).classes("items-center"):
                 panel_historial()
+            with ui.tab_panel(t_revisar).classes("items-center"):
+                panel_revisar()
             with ui.tab_panel(t_prov).classes("items-center"):
                 panel_proveedores()
             with ui.tab_panel(t_conf).classes("items-center"):
@@ -802,6 +805,55 @@ def panel_historial():
                                              on_click=lambda: continuar(ultimo)).props("outline"))
                 mientras_libre(ui.button(f"Deshacer el último lote ({ultimo.name}, {ejecutor.donde(ultimo)[0].upper() or '?'})",
                                          icon="undo", on_click=lambda: deshacer(ultimo)).props("color=negative outline"))
+
+
+# ------------------------------------------------------------------ Revisar (audit, read only)
+
+R = {"hallazgos": None, "cuando": ""}
+
+
+@de_a_uno
+async def revisar_ahora():
+    from . import auditoria
+    try:
+        R["hallazgos"] = await con_espera("Revisando la planilla y las carpetas…", auditoria.revisar, S.cfg)
+    except Exception as ex:
+        ui.notify(f"No pude revisar: {ex}", type="negative", multi_line=True)
+        return
+    from datetime import datetime
+    R["cuando"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+    panel_revisar.refresh()
+
+
+@ui.refreshable
+def panel_revisar():
+    from . import auditoria
+    with seccion("Revisar la planilla", "rule", "w-[860px]"):
+        ui.label("Compara la planilla con las carpetas de los proveedores y busca cosas para mirar: links rotos, filas "
+                 "repetidas o sin link, PDF que no están en ninguna fila, proveedores sin datos de pago y archivos "
+                 "viejos en _Entrada. Solo lee: no cambia nada.").classes("text-sm text-gray-600 text-center")
+        ui.label(f"Sobre: {S.cfg.planilla}").classes("text-xs text-gray-500 text-center break-all")
+        with ui.row().classes("justify-center gap-3"):
+            mientras_libre(ui.button("Revisar ahora", icon="rule", on_click=revisar_ahora).props(
+                "color=secondary unelevated"))
+            if R["hallazgos"]:
+                texto = auditoria.informe(R["hallazgos"])
+                ui.button("Copiar informe", icon="content_copy",
+                          on_click=lambda: (ui.clipboard.write(texto), ui.notify("Informe copiado", type="positive"))
+                          ).props("outline")
+    if not R["hallazgos"]:
+        return
+    with seccion(f"Resultado ({R['cuando']})", "fact_check", "w-[860px]"):
+        for h in R["hallazgos"]:
+            n = len(h.items)
+            titulo = f"{h.titulo}: " + (str(n) if n else "OK")
+            with ui.expansion(titulo, icon="check_circle" if not n else "report",
+                              value=0 < n <= 10).classes("w-full rounded " + ("" if not n else "bg-amber-50")):
+                ui.label(h.explicacion).classes("text-xs text-gray-600")
+                for x in h.items[:300]:
+                    ui.label("• " + x).classes("text-sm break-all")
+                if n > 300:
+                    ui.label(f"… y {n - 300} más (están todos en 'Copiar informe')").classes("text-xs text-gray-500")
 
 
 # ------------------------------------------------------------------ open / export the workbook

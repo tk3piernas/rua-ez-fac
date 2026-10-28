@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.10.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.11.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -91,6 +91,15 @@ Estructura de la carpeta de la app:
    - Botones Confirmar y Copiar al portapapeles. Si no hay avisos para revisar ni que frenen y nada excluido, Confirmar carga directo (sin el "¿Confirmo?"); si hay, pregunta.
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
 4. **Historial:** los lotes anteriores, con la fecha legible (28/10/2026 10:41), la columna **Dónde** (PRUEBA o REAL) y el estado. Un lote que quedó "en curso" porque se cerró la app a mitad aparece como **quedó a medias**. Para el último lote: **Terminar este lote** (si quedó a medias o con cosas pendientes) y **Deshacer**, que dice sobre qué planilla actúa.
+5. **Revisar** (auditoría, solo lee; también `python -m appfacturas revisar`): compara la planilla activa con las carpetas y lista, con un OK o la cantidad:
+   - links de J que apuntan a un PDF que ya no está;
+   - filas repetidas (mismo link, o mismo proveedor con el mismo texto en J);
+   - filas sin link;
+   - PDF guardados en las carpetas de los proveedores que no están en ninguna fila (puede ser algo ya pagado o algo que falta cargar);
+   - proveedores de la planilla sin datos de pago (ni en la hoja Proveedores ni en la memoria);
+   - filas con H escrito como número (Factura B o C, o IVA real distinto);
+   - archivos que esperan hace más de 7 días en `_Entrada`.
+   Botón **Copiar informe** para pegarlo en un mail o chat.
 5. **Proveedores** (`maestro.py`): memoria de datos de proveedores en `PROVEEDORES RUA.xlsx`.
    - Cuadro para pegar texto (mail, WhatsApp, .txt): lo lee el mismo lector de los .txt y arma una ficha editable con chequeos (dígito verificador de CUIT y CBU, banco del CBU). Si el proveedor ya está, muestra qué cambia.
    - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita el modo "Cargar en la planilla real" o "Practicar en la carpeta de prueba".
@@ -207,7 +216,7 @@ Estructura de la carpeta de la app:
 
 ## Comandos (python -m appfacturas …)
 
-`ui` (por defecto) · `verificar` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `verificar` · `empaquetar` · `prueba-mover` · `prueba-excel` · `paridad preparar|comparar`
+`ui` (por defecto) · `verificar` · `revisar` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `verificar` · `empaquetar` · `prueba-mover` · `prueba-excel` · `paridad preparar|comparar`
 
 ## Pruebas
 
@@ -226,7 +235,7 @@ Estructura de la carpeta de la app:
 
 - Probar el reset con Excel real (COM) en la PC, primero sobre la carpeta de prueba.
 
-- Pestaña Revisar: auditoría como `-Revisar` del script viejo.
 - Primera corrida real: Matheo elige "Cargar en la planilla real".
 - Modos con Claude: A (API, clave en el Administrador de credenciales de Windows) y B (Cowork, `_Revisar con Claude\<lote>\`).
+- Cierre de tanda (G2) y aviso de "N para leer" en el encabezado (G5).
 - Retirar el PS1.

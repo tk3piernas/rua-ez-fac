@@ -49,7 +49,6 @@ Se corren por separado porque cada carpeta tiene su `conftest.py`. Las dos tiene
 ## Pendiente
 
 - Probar el reset de la planilla con Excel real, primero en la carpeta de prueba.
-- Pestaña "Revisar" (auditoría como `-Revisar` del PS1).
 - Primera corrida real (Matheo elige "Cargar en la planilla real").
 - Modos con Claude (A: API; B: hand-off a Cowork).
 - Retirar el PS1 y con él `paridad/` y sus .bat.

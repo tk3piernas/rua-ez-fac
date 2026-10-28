@@ -28,6 +28,7 @@ class FilaPlanilla:
     monto: Decimal | None = None
     j_texto: str = ""
     j_link: str = ""
+    h_pisado: Decimal | None = None     # H written as a value instead of the IVA formula
 
 
 @dataclass
@@ -92,7 +93,8 @@ def leer(ruta: Path | None, hojas=AREAS) -> Planilla:
                 if j.hyperlink is not None and j.hyperlink.target:
                     link = link or j.hyperlink.target
                 pl.filas.append(FilaPlanilla(h, r, str(a).strip(), str(ws.cell(r, 2).value or "").strip(),
-                                             _fecha(ws.cell(r, 5).value), _dec(ws.cell(r, 7).value), texto, link))
+                                             _fecha(ws.cell(r, 5).value), _dec(ws.cell(r, 7).value), texto, link,
+                                             _dec(ws.cell(r, 8).value)))
         if "Proveedores" in wb.sheetnames:
             ws = wb["Proveedores"]
             for r in range(5, 301):

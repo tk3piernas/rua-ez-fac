@@ -44,6 +44,10 @@ Pestaña **Proveedores**: pegá los datos como vengan (mail, WhatsApp, .txt) y t
 
 En **Configuración → Modo de trabajo** elegís uno de tres: *Solo simular* (lee y muestra qué haría, sin tocar nada; así arranca la primera vez), *Practicar en la carpeta de prueba* (trabaja de verdad sobre una copia; nunca escribe en la planilla real, aunque la tengas abierta en Excel) o *Cargar en la planilla real*.
 
+## Revisar la planilla
+
+Pestaña **Revisar**: compara la planilla con las carpetas y te dice qué mirar (links rotos, filas repetidas o sin link, PDF que no están en ninguna fila, proveedores sin datos de pago, archivos viejos en `_Entrada`). Solo lee, no cambia nada.
+
 ## Abrir y exportar la planilla
 
 Arriba, al lado del nombre de la app: **Abrir planilla** abre en Excel la planilla en la que está escribiendo la app (la real o la de prueba). **Exportar planilla** guarda una copia con el nombre que elijas en `Planillas exportadas`, al lado de la planilla; la planilla sigue igual. Si después querés empezarla de cero, usá el Reset.

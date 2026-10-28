@@ -68,3 +68,19 @@ def test_pdf_con_cbu_se_marca(sandbox, tmp_path):
     lote = armar(sandbox)
     (f,) = claude_cowork.candidatas(lote)
     assert claude_cowork.tiene_cbu(f)
+
+
+def test_respuesta_con_cuit_invalido_avisa_por_que(sandbox):
+    """The sample ARCA invoice has an invented CUIT: Claude reads it, the app explains why it can't load it."""
+    _escaneada(sandbox.entrada / "Vehicular" / "scan.pdf")
+    lote = armar(sandbox)
+    d = claude_cowork.preparar(sandbox, lote, claude_cowork.candidatas(lote))
+    (d / "respuesta.json").write_text(json.dumps({"facturas": [{
+        "archivo": "scan.pdf", "cuit": "20010203047", "letra": "B", "punto_de_venta": 2, "numero": 1,
+        "total": "8500.00"}]}), encoding="utf-8")
+    lote = armar(sandbox)
+    f = lote.facturas[0]
+    assert f.estado == Estado.NO_LEIDA and f.ext.fuente == "claude"
+    assert any("Claude la leyó, pero el CUIT 20010203047 no es válido" in p for p in lote.pendientes)
+    assert any(a.codigo == "claude_no_carga" for a in lote.avisos)
+    assert claude_cowork.candidatas(lote) == [] and claude_cowork.respondidas_sin_cargar(lote) == [f]

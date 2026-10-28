@@ -794,10 +794,14 @@ def texto_donde(trabajo: Path) -> str:
 def seccion_claude(lote, cfg):
     from . import claude_cowork
     cands = claude_cowork.candidatas(lote)
+    sin_cargar = claude_cowork.respondidas_sin_cargar(lote)
     peds = claude_cowork.pedidos(cfg) if cfg.base else []
-    if not cands and not peds:
+    if not cands and not peds and not sin_cargar:
         return
     with seccion("Pasarle a Claude lo que no pude leer", "smart_toy"):
+        for f in sin_cargar:
+            ui.label(f"• {f.archivo.nombre}: Claude la leyó, pero {claude_cowork.por_que_no(f.ext)}. "
+                     "Queda en _Entrada para cargarla a mano.").classes("text-sm text-amber-700")
         if cands:
             ui.label(("1 PDF no se pudo leer" if len(cands) == 1 else f"{len(cands)} PDF no se pudieron leer")
                      + ". Puedo copiarlos a una carpeta con un pedido para Claude "

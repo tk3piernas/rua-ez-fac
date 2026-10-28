@@ -59,9 +59,28 @@ def raiz(cfg) -> Path:
 
 
 def candidatas(lote) -> list:
-    """Invoices of the batch worth sending: not read (or read without CUIT / number), and only PDFs."""
+    """Invoices of the batch worth sending: not read (or read without CUIT / number), only PDFs, and not already
+    answered by Claude (those are in respondidas_sin_cargar)."""
     return [f for f in lote.facturas if f.estado == Estado.NO_LEIDA and f.archivo.ruta.suffix.lower() == ".pdf"
-            and f.archivo.ruta.exists()]
+            and f.archivo.ruta.exists() and not (f.ext and f.ext.fuente == "claude")]
+
+
+def respondidas_sin_cargar(lote) -> list:
+    """Claude answered them, but what it read can't be loaded (e.g. an invalid CUIT)."""
+    return [f for f in lote.facturas if f.estado == Estado.NO_LEIDA and f.ext and f.ext.fuente == "claude"]
+
+
+def por_que_no(e) -> str:
+    """Why Claude's reading can't be loaded, in plain words."""
+    if not e.cuit and not e.numero_txt:
+        return "no encontró el CUIT del proveedor"
+    if e.cuit and not cuit_valido(e.cuit):
+        return f"el CUIT {e.cuit} no es válido (no da el dígito verificador)"
+    if e.cuit and (e.pv is None or e.nro is None):
+        return "no encontró el punto de venta o el número"
+    if not e.cuit and e.total is None:
+        return "no encontró el total"
+    return "faltan datos para cargarla"
 
 
 def tiene_cbu(f) -> bool:

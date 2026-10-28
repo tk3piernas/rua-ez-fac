@@ -151,9 +151,14 @@ class Armador:
                 f.estado, f.dup, f.a_duplicados = Estado.DUPLICADA, f"es el mismo archivo que {igual}", True
             else:
                 f.estado = Estado.NO_LEIDA
-                motivo = ("no tiene texto (¿escaneada?)" if not doc.tiene_texto else
-                          "formato no reconocido todavía" if not parser else
-                          "no pude leer CUIT / punto de venta / número")
+                if e and e.fuente == "claude":
+                    from . import claude_cowork
+                    motivo = "Claude la leyó, pero " + claude_cowork.por_que_no(e)
+                    self.lote.aviso(Nivel.REVISAR, "claude_no_carga", f"{nombre}: {motivo}. Cargala a mano.", f.id)
+                else:
+                    motivo = ("no tiene texto (¿escaneada?)" if not doc.tiene_texto else
+                              "formato no reconocido todavía" if not parser else
+                              "no pude leer CUIT / punto de venta / número")
                 self.lote.pendientes.append(f"{area or '?'}\\{nombre}  -> {motivo}")
             return f
         self.hash_tanda.setdefault(arch.sha256, f"{area}\\{nombre}")

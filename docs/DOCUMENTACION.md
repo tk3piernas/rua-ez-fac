@@ -245,6 +245,7 @@ Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <
 - **Si la planilla está abierta:** la busca en la Running Object Table y escribe en esa misma ventana. Solo toma el libro cuya ruta local es exactamente la de la planilla, o cuya URL de SharePoint completa es la de la planilla real de `config.toml` (también lo verifica con `FullName`). En la carpeta de prueba no se usa ninguna URL, así que nunca escribe en la planilla real aunque esté abierta, ni en una exportada con el mismo nombre.
 - **Si algo falla a mitad con la planilla abierta:** revierte las celdas y deja el libro como guardado, para que el reintento no pida guardar cambios que no hizo nadie.
 - **Si está cerrada:** abre un Excel oculto, guarda y cierra.
+- **Si Excel no responde** ("Call was rejected by callee", porque está arrancando o tiene un cartel escondido): reintenta abrir la planilla durante 20 segundos. Si sigue sin responder, no toca nada y pide cerrar los "Microsoft Excel" del Administrador de tareas y abrir Excel una vez a mano.
 - **Fila libre:** la primera fila entre la 12 y la 210 con A–G y J vacías.
 - **Columna J:** `=HYPERLINK("url","Factura 0002-00000189")`.
 - **Posible duplicado:** A:J en amarillo (color 13431551) y un comentario en A.

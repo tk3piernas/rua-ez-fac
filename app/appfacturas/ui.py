@@ -1845,7 +1845,7 @@ def que_se_va(inv: dict) -> list[str]:
     for it in inv["items"]:
         base = inv["raiz"] if it["donde"] == "onedrive" else inv["app"]
         lugar = "OneDrive" if it["donde"] == "onedrive" else "app"
-        out.append(f"{lugar}: {relativa(it['ruta'], base)}" + (f" ({it['archivos']} archivos)" if it["carpeta"] else ""))
+        out.append(f"{lugar}: {relativa(it['ruta'], base)}" + (f" ({it['archivos']} archivo{'' if it['archivos'] == 1 else 's'})" if it["carpeta"] else ""))
     return out
 
 

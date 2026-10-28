@@ -122,3 +122,33 @@ def test_revertir_deja_el_libro_abierto_como_guardado(tmp_path, monkeypatch):
         excel.escribir(cfg, lote, diario, tmp_path / "backups", log=lambda s: None)
     assert abiertos[0].saved is True
     assert abiertos[0].hoja("Vehicular").formula(excel.PRIMERA, "A") in ("", None)
+
+
+def test_reintenta_mientras_excel_esta_ocupado():
+    """'Call was rejected' (Excel starting or with a hidden dialog) is retried; other errors are not."""
+    import pytest
+    from appfacturas import excel
+
+    class Rechazo(Exception):
+        pass
+    intentos = []
+
+    def abre():
+        intentos.append(1)
+        if len(intentos) < 3:
+            raise Rechazo(excel.RPC_E_CALL_REJECTED, "Call was rejected by callee.")
+        return "libro"
+    assert excel._reintentar_ocupado(abre, segundos=5, pausa=0) == "libro" and len(intentos) == 3
+
+    def siempre():
+        raise Rechazo(excel.RPC_E_CALL_REJECTED, "Call was rejected by callee.")
+    with pytest.raises(Rechazo):
+        excel._reintentar_ocupado(siempre, segundos=0.05, pausa=0.01)
+
+    def otro():
+        intentos.append(1)
+        raise ValueError("otra cosa")
+    intentos.clear()
+    with pytest.raises(ValueError):
+        excel._reintentar_ocupado(otro, segundos=5, pausa=0)
+    assert len(intentos) == 1

@@ -27,6 +27,28 @@ class ExcelError(Exception):
     pass
 
 
+RPC_E_CALL_REJECTED = -2147418111        # Excel busy: starting, or a hidden dialog waiting for an answer
+EXCEL_NO_RESPONDE = ("Excel no responde (puede estar mostrando un cartel escondido). Cerrá los \"Microsoft Excel\" "
+                     "del Administrador de tareas, abrí Excel una vez a mano para ver si pide algo, y volvé a probar")
+
+
+def _ocupado(e: Exception) -> bool:
+    return bool(getattr(e, "args", None)) and e.args[0] == RPC_E_CALL_REJECTED
+
+
+def _reintentar_ocupado(fn, segundos: float = 20, pausa: float = 1):
+    """`fn()`, retried while Excel answers 'call was rejected' (it does that for a while when it starts)."""
+    import time
+    fin = time.monotonic() + segundos
+    while True:
+        try:
+            return fn()
+        except Exception as e:
+            if not _ocupado(e) or time.monotonic() >= fin:
+                raise
+            time.sleep(pausa)
+
+
 class LibroConCambios(ExcelError):
     """The workbook is open with unsaved changes: the app never saves the user's work on its own."""
 
@@ -175,9 +197,11 @@ class LibroCOM:
                 self.nuevo = True
                 self.xl.Visible = False
                 self.xl.DisplayAlerts = False
-                self.wb = self.xl.Workbooks.Open(str(ruta), 0, False)
+                self.wb = _reintentar_ocupado(lambda: self.xl.Workbooks.Open(str(ruta), 0, False))
             except Exception as e:
                 self.cerrar()
+                if _ocupado(e):
+                    raise ExcelError(EXCEL_NO_RESPONDE) from e
                 raise ExcelError(f"no pude abrir Excel: {e}") from e
         if self.wb.ReadOnly:
             self.cerrar()

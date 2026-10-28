@@ -42,7 +42,7 @@ Las facturas que se frenan (en rojo en la grilla, por ejemplo una Factura A sin 
 
 Pestaña **Proveedores**: pegá los datos como vengan (mail, WhatsApp, .txt) y tocá *Leer los datos*. La app saca CUIT, CBU/CVU, alias, banco y contacto, chequea el CUIT y el CBU y te muestra la ficha para corregir antes de guardar. Se guardan en `PROVEEDORES RUA.xlsx` (OneDrive, al lado de la planilla), que no se toca con las actualizaciones. Cuando un lote trae un proveedor que no está en la hoja Proveedores de la planilla, la app copia sus datos desde ahí; y los datos que llegan en .txt con un lote se guardan solos. Cada cambio se puede deshacer.
 
-La primera vez la app arranca con la **escritura real apagada**: sobre tus carpetas y tu planilla solo lee y simula. Para practicar, usá Configuración → *Trabajar sobre la carpeta de prueba*. En la carpeta de prueba la app nunca escribe en la planilla real, aunque la tengas abierta en Excel. Cuando estés seguro, prendé *Habilitar escritura real*.
+En **Configuración → Modo de trabajo** elegís uno de tres: *Solo simular* (lee y muestra qué haría, sin tocar nada; así arranca la primera vez), *Practicar en la carpeta de prueba* (trabaja de verdad sobre una copia; nunca escribe en la planilla real, aunque la tengas abierta en Excel) o *Cargar en la planilla real*.
 
 ## Abrir y exportar la planilla
 

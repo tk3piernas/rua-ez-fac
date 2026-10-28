@@ -1,10 +1,10 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.9.2 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.9.3 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
-1. Lee PDF, zip y .txt de proveedores, ya sea desde `Facturas pendientes\_Entrada\<Área>` o subidos desde la pantalla Cargar.
+1. Lee PDF, zip y .txt de proveedores, ya sea desde `Facturas pendientes\_Entrada\<Área>` o subidos desde la pantalla Cargar. **Quitar lo subido** borra solo esas copias (nunca los originales), avisa cuántas quitó y queda deshabilitado si no hay nada subido.
 2. Saca los datos de cada factura: CUIT, tipo, punto de venta y número, fechas, montos, IVA, ítems y N° de tarea.
 3. Detecta duplicados contra la planilla, contra las carpetas de cada proveedor y dentro del mismo lote.
 4. Arma las filas para `DEUDA A PAGAR ARG.xlsx` y las de la hoja Proveedores para los proveedores nuevos o que no estén en la hoja (con los datos de la memoria de proveedores si los tiene).
@@ -90,13 +90,16 @@ Estructura de la carpeta de la app:
 4. **Historial:** los lotes anteriores, con la columna **Dónde** (PRUEBA o REAL) y el estado. Un lote que quedó "en curso" porque se cerró la app a mitad aparece como **quedó a medias**. Para el último lote: **Terminar este lote** (si quedó a medias o con cosas pendientes) y **Deshacer**, que dice sobre qué planilla actúa.
 5. **Proveedores** (`maestro.py`): memoria de datos de proveedores en `PROVEEDORES RUA.xlsx`.
    - Cuadro para pegar texto (mail, WhatsApp, .txt): lo lee el mismo lector de los .txt y arma una ficha editable con chequeos (dígito verificador de CUIT y CBU, banco del CBU). Si el proveedor ya está, muestra qué cambia.
-   - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita la escritura real habilitada o la carpeta de prueba.
+   - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita el modo "Cargar en la planilla real" o "Practicar en la carpeta de prueba".
    - Al leer un lote, los proveedores que no están en la hoja Proveedores de la planilla toman sus datos de la memoria. Al confirmar, los datos de los .txt (y lo que se sacó de las facturas, solo para completar vacíos) se guardan en la memoria; deshacer el lote los vuelve atrás.
    - Historial de cambios en `datos\memoria_proveedores.json` (los de cada lote, en la carpeta del lote). El botón para deshacer el último cambio mira los dos historiales y dice de dónde vino el cambio (pegado a mano o un lote). Trabaja sobre el archivo que quedó anotado, aunque la app esté ahora en el otro modo (prueba o real). Solo vuelve atrás filas que nadie tocó después; si la app había creado el archivo y queda vacío, lo borra.
 6. **Configuración:**
    - **Setup** (ver abajo): crea lo que falte y muestra el chequeo.
-   - Carpeta de prueba sí o no, y rearmarla.
-   - **Habilitar escritura real** (`[app] modo_real`, apagado por defecto). Mientras está apagado, lo real solo se simula.
+   - **Modo de trabajo**, uno solo de tres (también se ve arriba a la derecha):
+     - **Solo simular** (por defecto): lee las facturas reales y muestra qué haría; no mueve nada ni escribe en ninguna planilla.
+     - **Practicar en la carpeta de prueba**: trabaja de verdad sobre `<app>\prueba\` (copia de la planilla y de las carpetas). Nunca toca lo real, aunque la planilla real esté abierta. Botón para rearmar la carpeta de prueba.
+     - **Cargar en la planilla real**: mueve en el OneDrive y escribe en la planilla real. Pide confirmación al elegirlo.
+     - Se guarda en `[app] modo_real` (true solo en el modo real). La carpeta de prueba se elige por sesión.
    - **Empezar la planilla de cero** (reset, ver abajo).
    - Una fila por ítem o una por factura; escribir el servicio en la columna C.
 - Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. Abajo a la derecha hay un aviso de versión alfa (foto de Simba: "¡ESTO ES UNA ALPHA! Mandar bugs y sugerencias a Matheo"), que se cierra con la X.
@@ -108,14 +111,14 @@ Estructura de la carpeta de la app:
   - En la app: `datos\`, `datos\lotes`, `datos\backups`, `datos\entrada_ui`.
   - En el OneDrive: `Facturas pendientes` con `_Entrada\<área>` para cada área, `_Entrada\_Duplicados`, `_Entrada\_Procesados`, una carpeta por área, `_Script` y `_Script\proveedores.csv` (solo el encabezado `CUIT;Area;Proveedor;Carpeta`).
   - Si no hay planilla, la puede crear **vacía**, pero solo si tildás aparte "Sí, crear una planilla nueva vacía" (si ya existe en la nube y OneDrive no la bajó todavía, una vacía genera una copia en conflicto). No lo ofrece si la carpeta del OneDrive está vacía o tiene archivos que todavía están solo en la nube. La planilla vacía tiene la misma estructura: una hoja por área (B4 alícuota, B5 `=TODAY()`, resumen H4:I9, encabezados en la fila 11, filas 12–210 con las fórmulas de H e I, formato de fechas y montos, colores de vencido / vence pronto, lista desplegable de Empresa desde la hoja Listas, una columna por área), Proveedores (encabezados A–O en la fila 4) y Listas.
-  - Si la planilla existe pero le faltan hojas de área (por ejemplo una de antes de Persona y ServiciosYa), las agrega como copia vacía de la última hoja de área: mismo formato, fórmulas y resumen, título y lista de Empresa propios. Antes guarda dos respaldos (en la carpeta `Respaldos`, al lado de la planilla, y en `datos\backups`). En la planilla real necesita la escritura real habilitada. Mientras falte la hoja, las facturas de esa área quedan frenadas con un aviso.
+  - Si la planilla existe pero le faltan hojas de área (por ejemplo una de antes de Persona y ServiciosYa), las agrega como copia vacía de la última hoja de área: mismo formato, fórmulas y resumen, título y lista de Empresa propios. Antes guarda dos respaldos (en la carpeta `Respaldos`, al lado de la planilla, y en `datos\backups`). En la planilla real necesita el modo "Cargar en la planilla real". Mientras falte la hoja, las facturas de esa área quedan frenadas con un aviso.
 - Después muestra el **chequeo** (lo mismo que `appfacturas verificar`): librerías, carpetas, `proveedores.csv`, planilla y hojas, link de SharePoint, Excel y Edge, con OK / FALTA.
 - Si no encuentra el OneDrive de RUA sincronizado, no crea nada en la nube y lo avisa.
 
 ## Reset de la planilla (preparar.reset_planilla)
 
 - Botón **Configuración → Empezar la planilla de cero → Reset de la planilla…**. Para confirmar hay que escribir BORRAR.
-- Trabaja sobre la planilla activa: la copia de prueba, o la real solo si está habilitada la escritura real.
+- Trabaja sobre la planilla activa: la copia de prueba, o la real solo en el modo "Cargar en la planilla real".
 - No crea un archivo nuevo: vacía **el mismo** archivo, así los links compartidos de OneDrive siguen andando.
   - Las hojas de cada área, filas 12–210: borra valores de A–G y J, links, comentarios y rellenos.
   - Vuelve a poner la fórmula de H, tomada de una fila que la conserve (o `=IF(G="","",ROUND(G*$B$4,2))`).
@@ -212,6 +215,6 @@ Estructura de la carpeta de la app:
 - Probar el reset con Excel real (COM) en la PC, primero sobre la carpeta de prueba.
 
 - Pestaña Revisar: auditoría como `-Revisar` del script viejo.
-- Primera corrida real: Matheo habilita la escritura real.
+- Primera corrida real: Matheo elige "Cargar en la planilla real".
 - Modos con Claude: A (API, clave en el Administrador de credenciales de Windows) y B (Cowork, `_Revisar con Claude\<lote>\`).
 - Retirar el PS1.

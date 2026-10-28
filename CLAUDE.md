@@ -23,7 +23,7 @@ Todo eso ya está en `.gitignore`. Si algo privado aparece como "untracked", agr
 - La UI va en español rioplatense; el código y los comentarios pueden ir en inglés.
 - La app, su `.venv` y su configuración viven en `Documents\App Facturas`, nunca dentro de OneDrive (el OneDrive de RUA bloquea .exe, .bat, .ps1 y .py). Las facturas y la planilla sí están en el OneDrive sincronizado (`OneDrive - Rua Asistencia`). No usar Microsoft Graph ni Azure.
 - Excel por COM (pywin32), con la planilla abierta o cerrada. Nunca escribir sobre la columna I. Pisar H solo con 0 en Factura B, Factura C y no fiscal, o si el IVA real difiere de la fórmula en más de `tolerancia_iva`. CUIT, teléfono, N° de cuenta y CBU van como texto.
-- `[app] modo_real` (Configuración → "Habilitar escritura real") arranca apagado. No escribas en la planilla ni en las carpetas reales para probar: usá la carpeta de prueba (`prueba\`) o los tests.
+- `[app] modo_real` (Configuración → Modo de trabajo → "Cargar en la planilla real") arranca apagado. No escribas en la planilla ni en las carpetas reales para probar: usá la carpeta de prueba (`prueba\`) o los tests.
 - Todo cambio de archivos o de la planilla tiene que poder deshacerse (diario + `deshacer`).
 - Claude como respaldo (modos A/B) está pendiente; si se hace: la API key va en el Administrador de credenciales de Windows (keyring) o en una variable de entorno, nunca en un archivo; no mandar CBU ni datos bancarios; revisar la documentación actual del SDK `anthropic` antes de escribir código.
 
@@ -50,6 +50,6 @@ Se corren por separado porque cada carpeta tiene su `conftest.py`. Las dos tiene
 
 - Probar el reset de la planilla con Excel real, primero en la carpeta de prueba.
 - Pestaña "Revisar" (auditoría como `-Revisar` del PS1).
-- Primera corrida real (Matheo habilita la escritura real).
+- Primera corrida real (Matheo elige "Cargar en la planilla real").
 - Modos con Claude (A: API; B: hand-off a Cowork).
 - Retirar el PS1 y con él `paridad/` y sus .bat.

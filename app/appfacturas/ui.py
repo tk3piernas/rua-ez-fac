@@ -142,6 +142,24 @@ def puede_escribir(cfg) -> bool:
     return S.usar_prueba or cfg.modo_real
 
 
+def quitar_subidos() -> tuple[int, int]:
+    """Deletes what was uploaded through the app (never the originals). Returns (deleted, left)."""
+    sub = carpeta_subidos()
+    archivos = [f for f in sub.rglob("*") if f.is_file()] if sub.exists() else []
+    quedan = 0
+    for f in archivos:
+        try:
+            f.unlink()
+        except OSError:
+            quedan += 1
+    for d in sorted((d for d in sub.rglob("*") if d.is_dir()), reverse=True) if sub.exists() else []:
+        try:
+            d.rmdir()
+        except OSError:
+            pass
+    return len(archivos) - quedan, quedan
+
+
 def contar_entrada(cfg) -> dict:
     out = {}
     for a in cfg.areas:
@@ -283,7 +301,7 @@ def pagina():
         elif puede_escribir(cfg):
             lbl_modo.text, tipo = "Trabajando sobre carpetas y planilla REALES", "pill-real"
         else:
-            lbl_modo.text, tipo = "REAL · solo simulación (escritura real apagada)", "pill-sim"
+            lbl_modo.text, tipo = "Solo simulando: no se mueve ni se escribe nada", "pill-sim"
         lbl_modo.classes(replace=f"pill {tipo}")
 
     with ui.column().classes("contenido items-center gap-4 px-4"):
@@ -336,8 +354,8 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                 await e.file.save(dest / Path(e.file.name).name)
                 contar.refresh()
 
-            ui.upload(multiple=True, auto_upload=True, on_upload=subido,
-                      label="Arrastrá PDF, zip o .txt (o hacé clic)").props('accept=".pdf,.zip,.txt"').classes("w-full")
+            subidor = ui.upload(multiple=True, auto_upload=True, on_upload=subido,
+                                label="Arrastrá PDF, zip o .txt (o hacé clic)").props('accept=".pdf,.zip,.txt"').classes("w-full")
             ui.label("Se copian a la app; los originales quedan donde estaban.").classes("text-xs text-gray-500 text-center")
 
         with seccion("2. Qué se va a leer", "folder_open", "w-[340px]"):
@@ -350,13 +368,20 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                         with ui.row().classes("gap-2 items-baseline"):
                             ui.label(etiqueta).classes("text-sm text-gray-600")
                             ui.label(str(n)).classes("text-xl font-bold").style("color: var(--navy)")
-            contar()
+                    b = ui.button("Quitar lo subido", icon="delete_sweep", on_click=vaciar_subidos).props("flat dense")
+                    if not c.get("subidos"):
+                        b.disable()
+                        b.tooltip("No hay nada subido acá")
 
             def vaciar_subidos():
-                import shutil
-                shutil.rmtree(carpeta_subidos(), ignore_errors=True)
+                n, quedan = quitar_subidos()
+                subidor.reset()                      # also the list of the upload box
+                if quedan:
+                    ui.notify(f"Quité {n} archivos; {quedan} no se pudieron borrar (¿están abiertos?)", type="warning")
+                else:
+                    ui.notify(f"Quité {n} archivos subidos" if n else "No había nada subido", type="positive" if n else "info")
                 contar.refresh()
-            ui.button("Quitar lo subido", icon="delete_sweep", on_click=vaciar_subidos).props("flat dense")
+            contar()
 
         with seccion("3. Leer", "search", "w-[300px]"):
             spinner = ui.spinner(size="lg")
@@ -494,10 +519,10 @@ def panel_revision(tabs=None, t_res=None):
                     mientras_libre(btn)
                 else:
                     btn.disable()
-                    btn.tooltip("La escritura en la planilla real todavía no está habilitada (Configuración)")
+                    btn.tooltip("Estás en 'Solo simular': para cargar, cambiá el modo en Configuración")
                 ui.button("Copiar filas al portapapeles", icon="content_copy", on_click=copiar).props("outline")
             if not puede_escribir(cfg):
-                ui.label("Sobre lo real, por ahora la app solo simula: habilitalo en Configuración.").classes("text-xs text-amber-700")
+                ui.label("Estás en 'Solo simular': para cargar, cambiá el modo en Configuración.").classes("text-xs text-amber-700")
             ui.label(f"Informe guardado en datos\\lotes\\{lote.id}").classes("text-xs text-gray-500")
 
 
@@ -799,7 +824,7 @@ def panel_proveedores():
     async def guardar():
         cfg = S.cfg
         if not puede_escribir(cfg):
-            ui.notify("Para guardar en la memoria real primero habilitá la escritura real (o usá la carpeta de prueba).",
+            ui.notify("Para guardar en la memoria real elegí 'Cargar en la planilla real' en Configuración → Modo de trabajo (o practicá en la carpeta de prueba).",
                       type="warning", multi_line=True)
             return
         if not F["vals"][1] and not F["vals"][2]:
@@ -928,37 +953,71 @@ def panel_config(refrescar_modo):
             ui.button("Revisar y preparar todo", icon="construction", on_click=dialogo_setup).props(
                 "color=secondary unelevated size=md").classes("px-5")
 
-        with seccion("Dónde trabaja la app", "folder", "w-[760px]"):
-            with ui.column().classes("items-center gap-1"):
-                ui.label(f"Facturas pendientes (real): {cfg_real.base}").classes("text-sm text-center")
-                ui.label(f"Planilla (real): {cfg_real.planilla}").classes("text-sm text-center")
-                ui.label(f"Configuración: {cfg_real.archivo}").classes("text-xs text-gray-500 text-center")
+        with seccion("Modo de trabajo", "tune", "w-[760px]"):
+            from .paridad import carpeta_prueba
+            ui.label("Elegí uno. Se ve siempre arriba a la derecha.").classes("text-sm text-gray-600 text-center")
 
-            def cambiar_prueba(e):
-                S.usar_prueba = bool(e.value)
+            def modo_actual() -> str:
+                return "prueba" if S.usar_prueba else ("real" if config.cargar().modo_real else "simulacion")
+
+            MODOS = {
+                "simulacion": ("Solo simular",
+                               "Lee tus facturas reales de _Entrada y te muestra qué haría, pero no mueve nada ni "
+                               "escribe en ninguna planilla. Sirve para revisar sin riesgo."),
+                "prueba": ("Practicar en la carpeta de prueba",
+                           f"Trabaja de verdad, pero sobre una copia: {carpeta_prueba()}. Mueve archivos y escribe en "
+                           "la COPIA de la planilla. Tus carpetas y la planilla real no se tocan, aunque la tengas abierta."),
+                "real": ("Cargar en la planilla real",
+                         f"Mueve las facturas en tu OneDrive y escribe en la planilla real: {cfg_real.planilla}. "
+                         "Cada lote se puede deshacer."),
+            }
+
+            async def elegir(modo: str):
+                if modo == modo_actual():
+                    return
+                if modo == "real":
+                    with ui.dialog() as dlg, ui.card().classes("items-center"):
+                        ui.label("¿Paso a cargar en la planilla REAL?").classes("font-bold")
+                        ui.label("Desde ahora Confirmar mueve archivos en tu OneDrive y escribe en la planilla real.").classes(
+                            "text-sm text-center")
+                        with ui.row().classes("justify-center"):
+                            ui.button("Sí, usar lo real", on_click=lambda: dlg.submit(True)).props("color=negative")
+                            ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
+                    if not await dlg:
+                        return
+                config.guardar_opcion(cfg_real.archivo, "app", "modo_real", modo == "real")
+                S.usar_prueba = modo == "prueba"
                 S.cfg = cfg_activa()
                 S.lote = None
                 panel_revision.refresh()
                 refrescar_modo()
-                ui.notify("Ahora trabajás sobre la " + ("carpeta de PRUEBA" if S.usar_prueba else "carpeta REAL"))
-            ui.switch("Trabajar sobre la carpeta de prueba (carpeta de la app\\prueba)", value=S.usar_prueba,
-                      on_change=cambiar_prueba)
+                selector.refresh()
+                ui.notify(f"Modo: {MODOS[modo][0]}")
+
+            @ui.refreshable
+            def selector():
+                actual = modo_actual()
+                with ui.column().classes("w-full gap-2"):
+                    for clave_, (titulo, texto) in MODOS.items():
+                        sel = clave_ == actual
+                        with ui.card().classes("w-full cursor-pointer p-3 " + ("bg-indigo-50 border-2 border-indigo-800" if sel else "")
+                                               ).on("click", lambda c=clave_: elegir(c)):
+                            with ui.row().classes("items-center gap-3 no-wrap"):
+                                ui.icon("radio_button_checked" if sel else "radio_button_unchecked").classes(
+                                    "text-indigo-900 text-xl")
+                                with ui.column().classes("gap-0"):
+                                    ui.label(titulo).classes("font-bold")
+                                    ui.label(texto).classes("text-sm text-gray-600").style("overflow-wrap: anywhere; word-break: normal")
+            selector()
 
             async def rearmar():
                 from . import paridad
                 await run.io_bound(paridad.preparar)
                 ui.notify("Carpeta de prueba rearmada con una copia de la planilla y el lote de prueba", type="positive")
-            ui.button("Rearmar la carpeta de prueba", icon="restart_alt", on_click=rearmar).props("outline")
-
-        with seccion("Escritura en la planilla y las carpetas reales", "lock_open", "w-[760px]"):
-            ui.label("Mientras esté apagado, sobre lo real la app solo lee y simula.").classes("text-xs text-gray-500")
-
-            def cambiar_real(e):
-                config.guardar_opcion(cfg_real.archivo, "app", "modo_real", bool(e.value))
-                S.cfg = cfg_activa()
-                refrescar_modo()
-                panel_revision.refresh()
-            ui.switch("Habilitar escritura real", value=cfg_real.modo_real, on_change=cambiar_real)
+            with ui.row().classes("justify-center items-center gap-3"):
+                ui.button("Rearmar la carpeta de prueba", icon="restart_alt", on_click=rearmar).props("outline")
+            ui.label(f"Facturas pendientes (real): {cfg_real.base} · Configuración: {cfg_real.archivo}").classes(
+                "text-xs text-gray-500 text-center break-all")
 
         with seccion("Empezar la planilla de cero", "restart_alt", "w-[760px]"):
             ui.label("Deja vacías las filas 12 a 210 de las hojas de cada área: valores, colores, comentarios y links. "
@@ -1047,7 +1106,7 @@ async def dialogo_setup():
         async def crear():
             nonlocal plan, ok, lineas
             if plan["hojas"] and not cfg_real.modo_real:
-                ui.notify("Las hojas nuevas de la planilla real se agregan con la escritura real habilitada "
+                ui.notify("Las hojas nuevas de la planilla real se agregan en el modo 'Cargar en la planilla real' "
                           "(Configuración). Ahora creo solo las carpetas y archivos.", type="warning", multi_line=True)
                 plan = {**plan, "hojas": []}
             try:
@@ -1104,7 +1163,7 @@ async def dialogo_reset():
     from . import preparar
     cfg = S.cfg
     if not puede_escribir(cfg):
-        ui.notify("Para vaciar la planilla real primero habilitá la escritura real (o usá la carpeta de prueba).",
+        ui.notify("Para vaciar la planilla real elegí 'Cargar en la planilla real' en Configuración → Modo de trabajo (o practicá en la carpeta de prueba).",
                   type="warning", multi_line=True)
         return
     with ui.dialog() as dlg, ui.card().classes("seccion w-[620px] max-w-full items-center gap-3 p-6"):

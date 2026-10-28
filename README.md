@@ -51,6 +51,8 @@ Baja la última versión, la guarda en **Documentos\RUA EZ-Fac** (nunca adentro 
    - La primera vez tarda unos minutos.
    - Al final te muestra una lista de OK / FALTA y queda el ícono **RUA EZ-Fac** en el Escritorio.
 
+La primera vez que la abrís, un **recorrido** te muestra cada parte de la app y qué hace. Lo podés volver a ver con el botón **?** de arriba.
+
 > **¡Esto es una alpha!** Mandá bugs y sugerencias a Matheo.
 
 ## Datos de proveedores

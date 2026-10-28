@@ -90,7 +90,7 @@ def marcar_cuando_aparezca(espera: float = 25.0) -> None:
 _candado = None                     # kept for the whole life of the process that starts the server
 
 
-def tomar_candado() -> bool:
+def tomar_candado(puerto: int = 8765) -> bool:
     """True if this is the only launcher starting the app right now (a named mutex). Several quick clicks on
     the icon start several launchers: only the first starts the server, the rest wait and show its window."""
     global _candado
@@ -100,7 +100,8 @@ def tomar_candado() -> bool:
         import win32api
         import win32event
         import winerror
-        _candado = win32event.CreateMutex(None, False, "Local\\RUA.EZFac.inicio")
+        # one lock per port: another installation (or the test one) on another port is another app
+        _candado = win32event.CreateMutex(None, False, f"Local\\RUA.EZFac.inicio.{puerto}")
         return win32api.GetLastError() != winerror.ERROR_ALREADY_EXISTS
     except Exception:
         return True

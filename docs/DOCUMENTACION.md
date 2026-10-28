@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.17.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.18.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -74,13 +74,14 @@ Estructura de la carpeta de la app:
 - El ícono abre un servidor local (NiceGUI) en `127.0.0.1:8765`. No es accesible desde otra PC.
 - Cuando el servidor está listo, abre la app en una ventana propia de Edge, o de Chrome si no está Edge, con `--app=`: sin pestañas ni barra de direcciones. Si no encuentra ninguno de los dos, usa el navegador predeterminado.
 - Con `pythonw` no hay consola: lo que pasa queda en `datos\app.log`.
+- **Recorrido para empezar** (`recorrido.py` + `static/recorrido.js`): la primera vez que se abre la app, un recorrido de 22 pasos oscurece la pantalla y resalta cada parte (modo de trabajo, "N para leer", planilla, Salir, cada pestaña y las secciones de Configuración) con una tarjeta que explica qué hace, y Anterior / Siguiente / Saltar (también Esc y las flechas). Cambia solo de pestaña. Lo que todavía no existe (la grilla sin un lote leído, "N para leer" sin nada esperando) se explica con la tarjeta en el medio. Se anota en `datos\recorrido.json` y no vuelve a salir solo; el botón **?** del encabezado lo repite. Los pasos apuntan a elementos marcados con `data-tour` en `ui.py` (un test controla que existan). El script lleva la fecha del archivo en la dirección, así el navegador no usa uno viejo después de actualizar.
 - Arriba, al lado del nombre de la app:
   - **N para leer**: aparece cuando hay archivos esperando en `_Entrada` o subidos en la app (se actualiza cada 5 segundos), y agrega "· M nuevos" si llegaron después de la última lectura (se recuerda en `datos\ultima_lectura.json`). Un clic lee desde cualquier pestaña y abre Revisión.
   - **Abrir planilla**: abre en Excel la planilla en la que escribe la app (la real o la copia de prueba, según el modo).
   - **Exportar planilla**: guarda una copia con el nombre que elijas (por defecto `DEUDA A PAGAR ARG dd-mm-aaaa`) en la carpeta `Planillas exportadas`, al lado de la planilla. Usa `SaveCopyAs` de Excel, así que si está abierta incluye lo que tenga sin guardar; la planilla no cambia. Nunca pisa una exportada con el mismo nombre. Después de exportar se puede abrir la copia o deshacer (la borra si nadie la tocó). Para empezar de cero después, Reset.
 - Deshacer un lote que ya estaba deshecho no hace nada (antes, un segundo clic informaba como "cambió después" todo lo que ya había vuelto).
 - **Barra de tareas:** la ventana es Edge en modo app, pero apenas se abre la app le pone la identidad `RUA.EZFac` (AppUserModelID), con su ícono, su nombre y el comando para volver a abrirla (`ventana.py`). Los accesos directos llevan la misma identidad. Así la ventana se agrupa con el ícono de RUA EZ-Fac y no con Edge, y *Anclar a la barra de tareas* (clic derecho en el ícono de la barra, o en el acceso directo) deja el ícono de la app y abre la app.
-- **Una sola ventana:** con la app abierta, tocar el ícono trae al frente la ventana que ya está, en vez de abrir otra. Varios clics rápidos mientras arranca no levantan varias copias: el primero arranca la app (con un candado de Windows, `Local\RUA.EZFac.inicio`) y los demás esperan y muestran su ventana. Configuración → *Ventana* → "Permitir abrir más de una ventana de la app" (`[app] varias_ventanas`, apagado por defecto) vuelve a abrir una ventana por clic.
+- **Una sola ventana:** con la app abierta, tocar el ícono trae al frente la ventana que ya está, en vez de abrir otra. Varios clics rápidos mientras arranca no levantan varias copias: el primero arranca la app (con un candado de Windows, `Local\RUA.EZFac.inicio.<puerto>`, uno por puerto) y los demás esperan y muestran su ventana. Configuración → *Ventana* → "Permitir abrir más de una ventana de la app" (`[app] varias_ventanas`, apagado por defecto) vuelve a abrir una ventana por clic.
 - El botón Salir, en la punta derecha del encabezado (al lado del modo de trabajo), cierra la ventana de la app (si el navegador no la deja cerrarse, muestra "RUA EZ-Fac se cerró") y apaga el servidor; lo fuerza a los 1,5 segundos si algo lo retiene.
 
 ## Pantallas

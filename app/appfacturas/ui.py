@@ -379,6 +379,10 @@ def pagina():
     ui.add_css(CSS)
     ui.colors(primary="#14147a", secondary="#ff542c", accent="#ff542c", positive="#15803d",
               negative="#dc2626", warning="#d97706", info="#2b2aa8")
+    from . import recorrido
+    # the file's date in the URL: after an update the browser never keeps the old script
+    ui.add_head_html(f'<script src="/ezfac/recorrido.js?v={int((STATIC / "recorrido.js").stat().st_mtime)}"></script>')
+    ui.on("ez_recorrido_fin", lambda e: recorrido.marcar_visto(datos(), bool((e.args or {}).get("terminado"))))
     S.cfg = cfg_activa()
     with ui.header().classes("ez-header items-center justify-between px-6 py-2"):
         with ui.row().classes("items-center gap-3"):
@@ -387,15 +391,17 @@ def pagina():
                 ui.label(NOMBRE).classes("text-xl font-bold leading-tight")
                 ui.label(f"Carga de facturas de proveedores · v{__version__}").classes("text-xs opacity-75")
             aviso_alfa()
-            with ui.row().classes("items-center gap-1 ml-4"):
+            with ui.row().classes("items-center gap-1 ml-4").props("data-tour=planilla"):
                 ui.button("Abrir planilla", icon="table_view", on_click=abrir_planilla).props("flat color=white").tooltip(
                     "Abre en Excel la planilla en la que está escribiendo la app (la real o la copia de prueba)")
                 ui.button("Exportar planilla", icon="file_download", on_click=dialogo_exportar).props("flat color=white")
                 aviso_para_leer()
         # mode on the right and, last of all, Salir at the far right (also when the header wraps)
         with ui.row().classes("items-center gap-3 ml-auto"):
-            lbl_modo = ui.label().classes("pill")
-            ui.button("Salir", icon="logout", on_click=_salir).props("flat color=white")
+            lbl_modo = ui.label().classes("pill").props("data-tour=modo")
+            ui.button(icon="help_outline", on_click=lambda: ui.run_javascript(recorrido.js())).props(
+                "flat round color=white").tooltip("Recorrido por la app: qué hace cada parte")
+            ui.button("Salir", icon="logout", on_click=_salir).props("flat color=white data-tour=salir")
 
     def refrescar_modo():
         cfg = S.cfg
@@ -409,13 +415,13 @@ def pagina():
 
     with ui.column().classes("contenido items-center gap-4 px-4"):
         with ui.tabs().props("align=center").classes("w-full") as tabs:
-            t_cargar = ui.tab("Cargar", icon="upload_file")
-            t_rev = ui.tab("Revisión", icon="fact_check")
-            t_res = ui.tab("Resultado", icon="task_alt")
-            t_hist = ui.tab("Historial", icon="history")
-            t_revisar = ui.tab("Revisar", icon="rule")
-            t_prov = ui.tab("Proveedores", icon="contacts")
-            t_conf = ui.tab("Configuración", icon="settings")
+            t_cargar = ui.tab("Cargar", icon="upload_file").props("data-tour=tab-cargar")
+            t_rev = ui.tab("Revisión", icon="fact_check").props("data-tour=tab-revision")
+            t_res = ui.tab("Resultado", icon="task_alt").props("data-tour=tab-resultado")
+            t_hist = ui.tab("Historial", icon="history").props("data-tour=tab-historial")
+            t_revisar = ui.tab("Revisar", icon="rule").props("data-tour=tab-revisar")
+            t_prov = ui.tab("Proveedores", icon="contacts").props("data-tour=tab-proveedores")
+            t_conf = ui.tab("Configuración", icon="settings").props("data-tour=tab-config")
         with ui.tab_panels(tabs, value=t_cargar).classes("w-full bg-transparent"):
             with ui.tab_panel(t_cargar).classes("items-center"):
                 panel_cargar(tabs, t_rev, refrescar_modo)
@@ -432,6 +438,8 @@ def pagina():
             with ui.tab_panel(t_conf).classes("items-center"):
                 panel_config(refrescar_modo)
     refrescar_modo()
+    if not recorrido.visto(datos()):
+        ui.timer(1.5, lambda: ui.run_javascript(recorrido.js()), once=True)   # first start: the guided tour
 
 
 @ui.refreshable
@@ -447,7 +455,7 @@ def aviso_para_leer() -> None:
         if f:
             await f()
     ui.button(texto, icon="mark_email_unread", on_click=clic).props(
-        "unelevated rounded dense color=white text-color=primary").classes("px-3").tooltip(
+        "unelevated rounded dense color=white text-color=primary data-tour=para-leer").classes("px-3").tooltip(
         "Hay archivos esperando en _Entrada o subidos acá" + (" (y algunos llegaron después de la última lectura)"
                                                                 if nuevos else "") + ". Clic: ir a Cargar y leerlos.")
 
@@ -466,7 +474,7 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
     with ui.row().classes("w-full justify-center items-stretch gap-6"):
         with seccion("1. Archivos", "upload_file", "w-[420px]"):
             area = ui.select({"": "Detectar por proveedor", **{a: a for a in config.AREAS}},
-                             value="", label="Área de lo que subís").classes("w-72")
+                             value="", label="Área de lo que subís").classes("w-72").props("data-tour=area")
 
             async def subido(e):
                 if Path(e.file.name).suffix.lower() == ".txt" and not area.value:
@@ -479,10 +487,10 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                 contar.refresh()
 
             subidor = ui.upload(multiple=True, auto_upload=True, on_upload=subido,
-                                label="Arrastrá PDF, zip o .txt (o hacé clic)").props('accept=".pdf,.zip,.txt"').classes("w-full")
+                                label="Arrastrá PDF, zip o .txt (o hacé clic)").props('accept=".pdf,.zip,.txt" data-tour=subir').classes("w-full")
             ui.label("Se copian a la app; los originales quedan donde estaban.").classes("text-xs text-gray-500 text-center")
 
-        with seccion("2. Qué se va a leer", "folder_open", "w-[340px]"):
+        with seccion("2. Qué se va a leer", "folder_open", "w-[340px]").props("data-tour=que-se-lee"):
             @ui.refreshable
             def contar():
                 c = contar_entrada(S.cfg) if S.cfg.base else {}
@@ -545,7 +553,7 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                 panel_revision.refresh()
                 panel_historial.refresh()
                 tabs.set_value(t_rev)
-            ui.button("Leer facturas", icon="search", on_click=leer).props("size=lg color=secondary unelevated").classes("px-6")
+            ui.button("Leer facturas", icon="search", on_click=leer).props("size=lg color=secondary unelevated data-tour=leer").classes("px-6")
 
             async def ir_y_leer():
                 """Header badge: read from any tab (leer() then opens Revisión)."""
@@ -591,7 +599,7 @@ def panel_revision(tabs=None, t_res=None):
 
         # --- warnings
         if any(niveles.values()):
-            with seccion("Avisos", "warning"):
+            with seccion("Avisos", "warning").props("data-tour=avisos"):
                 if niveles[Nivel.BLOQUEA]:
                     with ui.expansion(f"Frenan la carga ({len(niveles[Nivel.BLOQUEA])})", icon="block", value=True).classes("w-full bg-red-50 rounded"):
                         for a in niveles[Nivel.BLOQUEA]:
@@ -607,7 +615,7 @@ def panel_revision(tabs=None, t_res=None):
                             ui.label("• " + a.texto).classes("text-sm")
 
         # --- rows
-        with seccion("Filas que se cargan en la planilla", "table_rows"):
+        with seccion("Filas que se cargan en la planilla", "table_rows").props("data-tour=grilla"):
             ui.label("Doble clic para editar Proveedor, fechas, N° de tarea, Servicio o Monto; destildá 'Cargar' para dejar "
                      "una fila afuera. Amarillo = posible duplicado · rojo = frenada · violeta = leída por Claude."
                      ).classes("text-xs text-gray-500 text-center")
@@ -671,7 +679,7 @@ def panel_revision(tabs=None, t_res=None):
                         ui.label(f"• {Path(p['de']).name}  →  {_rel(a, cfg)}").classes("text-sm")
 
         # --- confirm
-        with seccion("Confirmar", "check_circle", "w-[760px]"):
+        with seccion("Confirmar", "check_circle", "w-[760px]").props("data-tour=confirmar"):
             with ui.row().classes("justify-center items-center gap-4"):
                 btn = ui.button("Confirmar y cargar", icon="check", on_click=lambda: confirmar(tabs, t_res)).props("size=lg color=positive unelevated").classes("px-6")
                 if puede_escribir(cfg):
@@ -909,7 +917,7 @@ def seccion_claude(lote, cfg):
 def panel_clave_claude():
     """Modo A: the API key, kept in the Windows Credential Manager (never in a file)."""
     from . import claude_api
-    with seccion("Claude para lo que no se puede leer", "bolt", "w-[760px]"):
+    with seccion("Claude para lo que no se puede leer", "bolt", "w-[760px]").props("data-tour=claude"):
         ui.label("Con una clave de la API de Claude, en Revisión aparece 'Leer ahora con la API de Claude' para los "
                  "PDF que la app no pudo leer. La clave se guarda en el Administrador de credenciales de Windows, "
                  "nunca en un archivo. Cada factura cuesta unos centavos de dólar en la cuenta de la clave.").classes(
@@ -1041,7 +1049,7 @@ def panel_historial():
     lotes = sorted((x for x in d.iterdir() if x.is_dir()), reverse=True) if d.exists() else []
     panel_tandas()
     n_tanda = tandas.tanda_de(datos())
-    with seccion("Lotes anteriores", "history", "w-[760px]"):
+    with seccion("Lotes anteriores", "history", "w-[760px]").props("data-tour=lotes"):
         if not lotes:
             ui.label("Todavía no hay lotes.").classes("text-gray-500")
             return
@@ -1078,7 +1086,7 @@ def panel_tandas():
     """Close the current round: export it as 'tanda N', note its batches and, optionally, empty the workbook."""
     from . import tandas
     cfg = S.cfg
-    with seccion("Tanda de pagos", "inventory_2", "w-[760px]"):
+    with seccion("Tanda de pagos", "inventory_2", "w-[760px]").props("data-tour=tanda"):
         if not cfg or not cfg.planilla:
             ui.label("No sé cuál es la planilla.").classes("text-gray-500")
             return
@@ -1189,7 +1197,7 @@ async def revisar_ahora():
 @ui.refreshable
 def panel_revisar():
     from . import auditoria
-    with seccion("Revisar la planilla", "rule", "w-[860px]"):
+    with seccion("Revisar la planilla", "rule", "w-[860px]").props("data-tour=revisar"):
         ui.label("Compara la planilla con las carpetas de los proveedores y busca cosas para mirar: links rotos, filas "
                  "repetidas o sin link, PDF que no están en ninguna fila, proveedores sin datos de pago y archivos "
                  "viejos en _Entrada. Solo lee: no cambia nada.").classes("text-sm text-gray-600 text-center")
@@ -1344,7 +1352,7 @@ def panel_proveedores():
         memoria.refresh()
 
     with ui.row().classes("w-full justify-center items-start gap-6"):
-        with seccion("Pegar datos de un proveedor", "content_paste", "w-[480px]"):
+        with seccion("Pegar datos de un proveedor", "content_paste", "w-[480px]").props("data-tour=proveedores"):
             ui.label("Pegá el texto como venga (mail, WhatsApp, .txt). La app saca CUIT, CBU/CVU, alias, banco y "
                      "contacto, los chequea y te muestra la ficha para revisar antes de guardar.").classes(
                 "text-sm text-gray-600 text-center")
@@ -1433,13 +1441,13 @@ def panel_proveedores():
 def panel_config(refrescar_modo):
     cfg_real = config.cargar()
     with ui.column().classes("w-full items-center gap-5"):
-        with seccion("Setup", "construction", "w-[760px]"):
+        with seccion("Setup", "construction", "w-[760px]").props("data-tour=setup"):
             ui.label("Crea las carpetas que falten (en la app y en tu OneDrive de RUA), una planilla vacía si no "
                      "tenés, y revisa que esté todo bien. Nunca pisa nada que ya exista.").classes("text-sm text-gray-600 text-center")
             mientras_libre(ui.button("Revisar y preparar todo", icon="construction", on_click=dialogo_setup)).props(
                 "color=secondary unelevated size=md").classes("px-5")
 
-        with seccion("Modo de trabajo", "tune", "w-[760px]"):
+        with seccion("Modo de trabajo", "tune", "w-[760px]").props("data-tour=modo-trabajo"):
             from .carpeta_prueba import carpeta_prueba
             ui.label("Elegí uno. Se ve siempre arriba a la derecha.").classes("text-sm text-gray-600 text-center")
 
@@ -1518,7 +1526,7 @@ def panel_config(refrescar_modo):
             ui.label(f"Facturas pendientes (real): {cfg_real.base} · Configuración: {cfg_real.archivo}").classes(
                 "text-xs text-gray-500 text-center ruta")
 
-        with seccion("Empezar la planilla de cero", "restart_alt", "w-[760px]"):
+        with seccion("Empezar la planilla de cero", "restart_alt", "w-[760px]").props("data-tour=reset"):
             ui.label("Deja vacías las filas 12 a 210 de las hojas de cada área: valores, colores, comentarios y links. "
                      "Vuelve a poner la fórmula del IVA en H, no toca la columna I ni el formato, y es el mismo "
                      "archivo (los links compartidos siguen andando). Antes guarda dos copias de respaldo.").classes(
@@ -1869,7 +1877,7 @@ def main(abrir_navegador: bool = True) -> None:
     from . import ventana
     cfg = config.cargar()
     url = f"http://127.0.0.1:{cfg.puerto}"
-    if not ventana.tomar_candado():
+    if not ventana.tomar_candado(cfg.puerto):
         # another click is already starting the app: wait for it and show its window
         for _ in range(150):
             if _puerto_ocupado(cfg.puerto):

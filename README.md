@@ -77,6 +77,7 @@ Simular (CLI).bat                      simula _Entrada sin interfaz y deja un in
 requirements*.txt                      librerías con versión fija (ver docs para el --no-deps)
 app/appfacturas/                       código (Python + NiceGUI)
 app/tests/                             pruebas que corren sin facturas reales
+app/herramientas/                      pruebas automáticas sobre la carpeta de prueba y la paridad con el script viejo (retirado)
 CLAUDE.md                              reglas para Claude Code (qué nunca se sube, cómo probar y publicar)
 docs/                                  guía de uso (PDF y su HTML en docs/guia), documentación técnica y prompt de revisión
 ```
@@ -86,7 +87,7 @@ Lo que crea cada instalación queda fuera del repo: `.venv\`, `datos\` (lotes, i
 ## Privacidad
 
 - El repo **no** incluye facturas, CUIT ni CBU de proveedores.
-- La batería completa de pruebas, que usa facturas reales, y la prueba de paridad contra el script viejo quedan solo en la PC de desarrollo (`app/tests_privados/` y `paridad/` están en `.gitignore`).
+- La batería completa de pruebas, que usa facturas reales, queda solo en la PC de desarrollo (`app/tests_privados/` está en `.gitignore`).
 - Nada sale de la PC: la app corre en `127.0.0.1` y escribe en el OneDrive sincronizado.
 
 ## Desarrollo

@@ -158,7 +158,7 @@ def carpeta_subidos() -> Path:
 
 def base_activa(cfg) -> Path | None:
     if S.usar_prueba:
-        from .paridad import carpeta_prueba
+        from .carpeta_prueba import carpeta_prueba
         return carpeta_prueba() / "Facturas pendientes"
     return config.cargar().base
 
@@ -1287,7 +1287,7 @@ def panel_config(refrescar_modo):
                 "color=secondary unelevated size=md").classes("px-5")
 
         with seccion("Modo de trabajo", "tune", "w-[760px]"):
-            from .paridad import carpeta_prueba
+            from .carpeta_prueba import carpeta_prueba
             ui.label("Elegí uno. Se ve siempre arriba a la derecha.").classes("text-sm text-gray-600 text-center")
 
             def modo_actual() -> str:
@@ -1357,8 +1357,8 @@ def panel_config(refrescar_modo):
 
             @de_a_uno
             async def rearmar():
-                from . import paridad
-                await con_espera("Rearmando la carpeta de prueba…", paridad.preparar)
+                from . import carpeta_prueba
+                await con_espera("Rearmando la carpeta de prueba…", carpeta_prueba.rearmar)
                 ui.notify("Carpeta de prueba rearmada con una copia de la planilla y el lote de prueba", type="positive")
             with ui.row().classes("justify-center items-center gap-3"):
                 mientras_libre(ui.button("Rearmar la carpeta de prueba", icon="restart_alt", on_click=rearmar).props("outline"))

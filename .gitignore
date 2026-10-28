@@ -16,10 +16,9 @@ __pycache__/
 /app/tests_privados/
 /app/tests/fixtures/
 
-# tools that compare against the old PS1 script / need real invoices
+# the old PS1 script (retired) and local tools that need real invoices
 /paridad/
-/Prueba de paridad.bat
-/Simular con el script viejo.bat
+*.ps1
 /Probar Excel (prueba).bat
 /Probar mover archivos (prueba).bat
 

@@ -1,12 +1,18 @@
-"""Automatic test of stage 3 on the sandbox: snapshot, real run, snapshot, undo, compare."""
+r"""Automatic tests on the test folder: move files (stage 3) and Excel (stage 4), each undone and compared.
+
+  .venv\Scripts\python.exe app\herramientas\prueba.py mover | excel
+"""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from . import ejecutor, paridad, reporte
-from .config import AREAS, carpeta_app, cargar
-from .lote import Armador, entradas_de_carpeta
-from .util import ahora_id, sha256
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from appfacturas import carpeta_prueba as paridad, ejecutor, reporte  # noqa: E402
+from appfacturas.config import AREAS, carpeta_app, cargar  # noqa: E402
+from appfacturas.lote import Armador, entradas_de_carpeta  # noqa: E402
+from appfacturas.util import ahora_id, sha256  # noqa: E402
 
 
 def foto(raiz: Path) -> dict[str, str]:
@@ -104,7 +110,7 @@ def _abrir_visible(libro: Path, w) -> bool:
     """Opens the sandbox workbook in Excel like a person would, and waits until it is open."""
     import os
     import time
-    from .excel import LibroCOM
+    from appfacturas.excel import LibroCOM
     os.startfile(str(libro))
     for _ in range(60):
         time.sleep(1)
@@ -119,7 +125,7 @@ def _abrir_visible(libro: Path, w) -> bool:
 
 
 def _cerrar_visible(libro: Path) -> None:
-    from .excel import LibroCOM
+    from appfacturas.excel import LibroCOM
     wb = LibroCOM._buscar_abierto(libro, "")
     if wb is not None:
         xl = wb.Application
@@ -129,7 +135,7 @@ def _cerrar_visible(libro: Path) -> None:
 
 
 def prueba_excel(salida: Path) -> bool:
-    from . import excel
+    from appfacturas import excel
     L = []
     w = lambda s="": (L.append(s), print(s))
     todo_ok = True
@@ -202,3 +208,12 @@ def prueba_excel(salida: Path) -> bool:
         todo_ok = todo_ok and ok
     salida.write_text("\n".join(L), encoding="utf-8")
     return todo_ok
+
+
+if __name__ == "__main__":
+    accion = sys.argv[1] if len(sys.argv) > 1 else ""
+    if accion not in ("mover", "excel"):
+        print("uso: prueba.py mover | excel")
+        sys.exit(2)
+    salida = carpeta_app() / "datos" / f"prueba_{accion}.txt"
+    sys.exit(0 if (prueba_mover if accion == "mover" else prueba_excel)(salida) else 1)

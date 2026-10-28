@@ -13,7 +13,7 @@ App de escritorio (Python 3.15 + NiceGUI) que carga las facturas de proveedores 
 `github.com/tk3piernas/rua-ez-fac` es público. Antes de cada commit revisá `git status` y `git diff --cached --stat`. Nunca commitees:
 
 - Facturas, PDFs o zips de proveedores, ni CUIT, CBU, CVU, alias o números de cuenta reales (en tests usá números inventados con dígito verificador válido).
-- `app/tests_privados/` (tests con facturas reales y sus fixtures), `datos/`, `prueba/`, `config.toml`, `.venv/`, `paridad/`.
+- `app/tests_privados/` (tests con facturas reales y sus fixtures), `datos/`, `prueba/`, `config.toml`, `.venv/`, `paridad/` y cualquier `.ps1`.
 - Rutas o URLs personales nuevas (por ejemplo la URL de SharePoint de Matheo) dentro del código.
 
 Todo eso ya está en `.gitignore`. Si algo privado aparece como "untracked", agregalo a `.gitignore` en vez de commitearlo. Si ves que ya se subió algo privado, frená y avisale a Matheo.
@@ -51,4 +51,3 @@ Se corren por separado porque cada carpeta tiene su `conftest.py`. Las dos tiene
 - Probar el reset de la planilla con Excel real, primero en la carpeta de prueba.
 - Primera corrida real (Matheo elige "Cargar en la planilla real").
 - Modos con Claude (A: API; B: hand-off a Cowork).
-- Retirar el PS1 y con él `paridad/` y sus .bat.

@@ -1,59 +1,20 @@
-"""Parity test against the old PS1: build a sandbox, then compare both simulations invoice by invoice.
+r"""Parity test against the old PS1 (retired): compare both simulations invoice by invoice.
+Kept as a tool, outside the app package.
 
-  python -m appfacturas paridad preparar      -> prueba\\OneDrive - Rua Asistencia\\Facturas pendientes
-  python -m appfacturas paridad comparar      -> datos\\paridad_resultado.txt
+  .venv\Scripts\python.exe app\herramientas\paridad.py preparar    -> rebuilds the test folder
+  .venv\Scripts\python.exe app\herramientas\paridad.py comparar    -> datos\paridad_resultado.txt
 """
 from __future__ import annotations
 
 import json
 import re
-import shutil
+import sys
 from pathlib import Path
 
-from .config import carpeta_app, cargar
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# real invoices used as fixtures: local only (never in the repo)
-FIXTURES = next((p for p in (Path(__file__).resolve().parents[1] / "tests_privados" / "fixtures",
-                             Path(__file__).resolve().parents[1] / "tests" / "fixtures") if p.is_dir()),
-                Path(__file__).resolve().parents[1] / "tests_privados" / "fixtures")
-
-# test batch (area; fixture; name in _Entrada). Lives with the fixtures: they are real invoices and stay off the repo.
-def lote_prueba() -> list[tuple[str, str, str]]:
-    f = FIXTURES / "lote_prueba.csv"
-    if not f.is_file():
-        return []
-    filas = [l.split(";") for l in f.read_text(encoding="utf-8").splitlines()[1:] if l.strip()]
-    return [(a, b, c) for a, b, c in filas if (FIXTURES / b).is_file()]
-
-
-def carpeta_prueba() -> Path:
-    return carpeta_app() / "prueba" / "OneDrive - Rua Asistencia"
-
-
-def preparar() -> Path:
-    """Copy of the real Facturas pendientes (saved invoices + csv) and of the workbook, plus the test batch."""
-    real = cargar()
-    if not real.base:
-        raise RuntimeError('No encuentro la carpeta "Facturas pendientes" del OneDrive de RUA.')
-    dest = carpeta_prueba()
-    if dest.exists():
-        shutil.rmtree(dest)
-    base = dest / "Facturas pendientes"
-    for a in real.areas:
-        if (real.base / a).is_dir():
-            shutil.copytree(real.base / a, base / a)
-        (base / "_Entrada" / a).mkdir(parents=True, exist_ok=True)
-    (base / "_Script").mkdir(parents=True, exist_ok=True)
-    if real.csv_proveedores.is_file():
-        shutil.copy2(real.csv_proveedores, base / "_Script" / "proveedores.csv")
-    if real.planilla and real.planilla.exists():
-        shutil.copy2(real.planilla, dest / real.planilla.name)
-    lote = lote_prueba()
-    for area, fx, nombre in lote:
-        shutil.copy2(FIXTURES / fx, base / "_Entrada" / area / nombre)
-    print(f"Carpeta de prueba lista: {base}")
-    print(f"Lote de prueba: {len(lote)} archivos en _Entrada")
-    return base
+from appfacturas.carpeta_prueba import carpeta_prueba, preparar  # noqa: E402,F401
+from appfacturas.config import carpeta_app  # noqa: E402
 
 
 # ------------------------------------------------------------------ PS1 transcript
@@ -101,7 +62,7 @@ def leer_ps1(ruta: Path) -> dict:
 
 def _monto(v) -> str:
     from decimal import Decimal
-    from .util import fmt_monto
+    from appfacturas.util import fmt_monto
     return fmt_monto(Decimal(v)) if v not in (None, "") else "sin monto"
 
 
@@ -231,7 +192,7 @@ def comparar(ps1: Path, lote_dir: Path, salida: Path) -> int:
 
 def _monto_txt(s):
     """'$ 260,000.00' or '$ -260.000,00' (the PS1 prints with the PC's culture) -> Decimal."""
-    from .util import parse_monto
+    from appfacturas.util import parse_monto
     if not s or "sin monto" in s:
         return None
     return parse_monto(s.replace("$", "").replace(" ", ""))
@@ -259,3 +220,17 @@ def _d(v):
 def ultimo_lote() -> Path:
     d = carpeta_app() / "datos" / "lotes"
     return max((x for x in d.iterdir() if x.is_dir()), key=lambda x: x.name)
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="paridad contra el script viejo (OrdenarFacturas.ps1)")
+    ap.add_argument("accion", choices=["preparar", "comparar"])
+    ap.add_argument("--ps1", type=Path, help="transcript del PS1")
+    ap.add_argument("--lote", type=Path, help="carpeta del lote de la app (por defecto, el último)")
+    a = ap.parse_args()
+    if a.accion == "preparar":
+        preparar()
+        sys.exit(0)
+    datos = carpeta_app() / "datos"
+    sys.exit(1 if comparar(a.ps1 or datos / "ps1_paridad.txt", a.lote or ultimo_lote(), datos / "paridad_resultado.txt") else 0)

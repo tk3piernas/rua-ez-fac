@@ -22,18 +22,12 @@ def main(argv=None) -> int:
     s.add_argument("--sin-planilla", action="store_true", help="no leer la planilla")
     s.add_argument("--config", type=Path)
     s.add_argument("--salida", type=Path, help="también guarda el informe en este archivo")
-    pr = sub.add_parser("paridad", help="test de paridad contra el script viejo")
-    pr.add_argument("accion", choices=["preparar", "comparar"])
-    pr.add_argument("--ps1", type=Path, help="transcript del PS1 (comparar)")
-    pr.add_argument("--lote", type=Path, help="carpeta del lote de la app (por defecto, el último)")
     pc = sub.add_parser("procesar", help="mueve los archivos del lote (etapa 3: sin Excel)")
     pc.add_argument("--base", type=Path, help="carpeta Facturas pendientes")
     pc.add_argument("--real", action="store_true", help="permitir la carpeta real de OneDrive")
     pc.add_argument("--si", action="store_true", help="no preguntar")
     dh = sub.add_parser("deshacer", help="deshace el último lote confirmado")
     dh.add_argument("--si", action="store_true", help="no preguntar")
-    sub.add_parser("prueba-mover", help="prueba la etapa 3 en la carpeta de prueba y la deshace")
-    sub.add_parser("prueba-excel", help="prueba la etapa 4 sobre una copia de la planilla (cerrada y abierta)")
     ep = sub.add_parser("excel-pendiente", help="escribe en la planilla las filas que quedaron pendientes")
     ep.add_argument("--guardar-cambios", action="store_true", help="si la planilla tiene cambios sin guardar, guardarlos antes")
     sub.add_parser("portapapeles", help="copia al portapapeles las filas del último lote (para pegarlas a mano)")
@@ -57,12 +51,6 @@ def main(argv=None) -> int:
             instalacion.empaquetar()
             return 0
         return 0 if instalacion.verificar(config.carpeta_app() / "datos" / "verificacion.txt") else 1
-    if a.cmd == "prueba-mover":
-        from . import prueba
-        return 0 if prueba.prueba_mover(config.carpeta_app() / "datos" / "prueba_mover.txt") else 1
-    if a.cmd == "prueba-excel":
-        from . import prueba
-        return 0 if prueba.prueba_excel(config.carpeta_app() / "datos" / "prueba_excel.txt") else 1
     if a.cmd == "excel-pendiente":
         from . import ejecutor
         d = ejecutor.ultimo_confirmado(config.carpeta_app() / "datos" / "lotes")
@@ -86,15 +74,6 @@ def main(argv=None) -> int:
         return _procesar(a)
     if a.cmd == "deshacer":
         return _deshacer(a)
-    if a.cmd == "paridad":
-        from . import paridad
-        if a.accion == "preparar":
-            paridad.preparar()
-            return 0
-        datos = config.carpeta_app() / "datos"
-        sin = paridad.comparar(a.ps1 or datos / "ps1_paridad.txt", a.lote or paridad.ultimo_lote(),
-                               datos / "paridad_resultado.txt")
-        return 1 if sin else 0
 
     cfg = config.cargar(a.config, base=a.base)
     if a.planilla:
@@ -121,7 +100,8 @@ def main(argv=None) -> int:
 
 
 def _procesar(a) -> int:
-    from . import ejecutor, prueba
+    from . import ejecutor
+    from .util import ahora_id
     cfg = config.cargar(base=a.base)
     if not cfg.base:
         print('No encuentro la carpeta "Facturas pendientes".')
@@ -130,7 +110,10 @@ def _procesar(a) -> int:
     if not en_prueba and not a.real:
         print("Por ahora (etapa 3) solo se mueven archivos en la carpeta de prueba. Usá --real para la carpeta real.")
         return 1
-    lote, trabajo = prueba.correr_lote(cfg, simular=False)
+    trabajo = config.carpeta_app() / "datos" / "lotes" / ahora_id()
+    ents, txts = entradas_de_carpeta(cfg)
+    lote = Armador(cfg, simular=False, trabajo=trabajo).procesar(ents, txts)
+    reporte.guardar(lote, trabajo.parent, reporte.texto(lote, cfg))
     print(reporte.texto(lote, cfg))
     if not a.si and input("\n¿Confirmo y muevo los archivos? (s/n) ").strip().lower() != "s":
         print("No se hizo nada.")

@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.13.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.13.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -219,18 +219,20 @@ Estructura de la carpeta de la app:
 
 ## Comandos (python -m appfacturas …)
 
-`ui` (por defecto) · `verificar` · `revisar` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `verificar` · `empaquetar` · `prueba-mover` · `prueba-excel` · `paridad preparar|comparar`
+`ui` (por defecto) · `verificar` · `revisar` · `simular [--entrada]` · `procesar [--real]` · `deshacer` · `excel-pendiente` · `portapapeles` · `empaquetar`
+
+Herramientas aparte (fuera del paquete, en `app\herramientas\`): `prueba.py mover|excel` (pruebas automáticas sobre la carpeta de prueba) y `paridad.py preparar|comparar` (la comparación contra el script viejo, ya retirado; necesita el PS1, que no está en el repo).
 
 ## Pruebas
 
 - `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, Recibo y Nota de Venta, tarea vs precio, CUIT del emisor, No Gravado, ARCA sin período, Factura B, Nota de Débito, IVA 10,5 %, PDF escaneado y con contraseña, original y duplicado en un PDF, zip con subcarpetas, .txt con dos CBU, mismo número contra las carpetas, archivos que no se movieron, memoria y reset que se deshacen, edición de Proveedor y Monto, deshacer con A o J cambiadas, reintentar sin la hoja, zip excluido a medias, link de SharePoint con el registro simulado, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
 - `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, otros sistemas de facturación, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
 - Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Las dos usan openpyxl y tardan segundos. La prueba que abre Excel de verdad (COM) corre solo si se pide: `python -m pytest -q -m excel app\tests_privados` (un minuto y medio).
-- También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).
+- También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) (los dos llaman a `app\herramientas\prueba.py`). La paridad contra el script viejo dio 0 diferencias sin explicar; el script y sus .bat se retiraron en la 0.13.1.
 
 ## Desarrollo con Claude Code y Git
 
-- La carpeta de la app en la PC de desarrollo es a la vez una copia de trabajo de Git del repo `tk3piernas/rua-ez-fac`. Lo que es local (entorno, datos, configuración, facturas de prueba, herramientas de paridad) está en `.gitignore`.
+- La carpeta de la app en la PC de desarrollo es a la vez una copia de trabajo de Git del repo `tk3piernas/rua-ez-fac`. Lo que es local (entorno, datos, configuración, facturas de prueba, el script viejo) está en `.gitignore`.
 - `CLAUDE.md` (en la raíz) tiene las reglas para Claude Code: qué nunca se sube, cómo probar, cómo versionar y que después de cada cambio hace commit y `git push` a `main`.
 - Un compañero que solo usa la app no necesita Git: baja el ZIP del repo o usa `Armar instalador para otra PC.bat`.
 
@@ -240,4 +242,3 @@ Estructura de la carpeta de la app:
 
 - Primera corrida real: Matheo elige "Cargar en la planilla real".
 - Modos con Claude: A (API, clave en el Administrador de credenciales de Windows) y B (Cowork, `_Revisar con Claude\<lote>\`).
-- Retirar el PS1.

@@ -51,7 +51,7 @@ def factura(ruta, nro, letra="A", neto="100.000,00", iva="21.000,00", total="121
     if cabecera:
         t(30, 22, cabecera)
     t(290, 45, letra, 24)
-    t(285, 60, "Cod. 01" if letra == "A" else "Cod. 11", 8)
+    t(285, 60, "Cod. " + {"A": "01", "B": "06"}.get(letra, "11"), 8)
     t(360, 40, "FACTURA", 14)
     t(360, 60, f"Nº: 0003-{nro:08d}")
     t(360, 74, "Fecha: 15/10/2026")
@@ -176,3 +176,15 @@ def test_cuit_del_emisor_es_el_de_la_etiqueta_arriba(sandbox):
     lote = armar(sandbox)
     assert lote.facturas[0].ext.cuit == CUIT
     assert any("varios CUIT" in a.texto and a.nivel == Nivel.REVISAR for a in lote.avisos)
+
+
+def test_factura_b(sandbox):
+    """Factura B: the amount already includes IVA, so G = total and H = 0 (never the 21 % formula)."""
+    factura(sandbox.entrada / "Vehicular" / "b.pdf", 81, letra="B", neto=None, iva=None, total="121.000,00")
+    lote = armar(sandbox)
+    e = lote.facturas[0].ext
+    assert (e.letra, e.tipo, e.cod_comprobante) == ("B", "Factura", 6)
+    (r,) = lote.filas
+    assert (r.monto, r.iva) == (D("121000.00"), D("0"))
+    assert not r.excluida
+    assert any(a.codigo == "factura_b" for a in lote.avisos)

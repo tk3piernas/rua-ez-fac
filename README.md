@@ -46,7 +46,7 @@ En **Configuración → Modo de trabajo** elegís uno de tres: *Solo simular* (l
 
 ## Abrir y exportar la planilla
 
-Arriba a la derecha: **Abrir planilla** abre en Excel la planilla en la que está escribiendo la app (la real o la de prueba). **Exportar planilla** guarda una copia con el nombre que elijas en `Planillas exportadas`, al lado de la planilla; la planilla sigue igual. Si después querés empezarla de cero, usá el Reset.
+Arriba, al lado del nombre de la app: **Abrir planilla** abre en Excel la planilla en la que está escribiendo la app (la real o la de prueba). **Exportar planilla** guarda una copia con el nombre que elijas en `Planillas exportadas`, al lado de la planilla; la planilla sigue igual. Si después querés empezarla de cero, usá el Reset.
 
 ## Empezar la planilla de cero
 

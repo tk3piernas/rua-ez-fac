@@ -287,11 +287,13 @@ def pagina():
             with ui.column().classes("gap-0"):
                 ui.label(NOMBRE).classes("text-xl font-bold leading-tight")
                 ui.label(f"Carga de facturas de proveedores · v{__version__}").classes("text-xs opacity-75")
-        lbl_modo = ui.label().classes("pill")
-        with ui.row().classes("items-center gap-1"):
-            ui.button("Abrir planilla", icon="table_view", on_click=abrir_planilla).props("flat color=white").tooltip(
-                "Abre en Excel la planilla en la que está escribiendo la app (la real o la copia de prueba)")
-            ui.button("Exportar planilla", icon="file_download", on_click=dialogo_exportar).props("flat color=white")
+            with ui.row().classes("items-center gap-1 ml-4"):
+                ui.button("Abrir planilla", icon="table_view", on_click=abrir_planilla).props("flat color=white").tooltip(
+                    "Abre en Excel la planilla en la que está escribiendo la app (la real o la copia de prueba)")
+                ui.button("Exportar planilla", icon="file_download", on_click=dialogo_exportar).props("flat color=white")
+        # mode on the right and, last of all, Salir at the far right (also when the header wraps)
+        with ui.row().classes("items-center gap-3 ml-auto"):
+            lbl_modo = ui.label().classes("pill")
             ui.button("Salir", icon="logout", on_click=_salir).props("flat color=white")
 
     def refrescar_modo():

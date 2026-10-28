@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.9.4 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.9.5 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -68,11 +68,11 @@ Estructura de la carpeta de la app:
 - El ícono abre un servidor local (NiceGUI) en `127.0.0.1:8765`. No es accesible desde otra PC.
 - Cuando el servidor está listo, abre la app en una ventana propia de Edge, o de Chrome si no está Edge, con `--app=`: sin pestañas ni barra de direcciones. Si no encuentra ninguno de los dos, usa el navegador predeterminado.
 - Con `pythonw` no hay consola: lo que pasa queda en `datos\app.log`.
-- Arriba a la derecha:
+- Arriba, al lado del nombre de la app:
   - **Abrir planilla**: abre en Excel la planilla en la que escribe la app (la real o la copia de prueba, según el modo).
   - **Exportar planilla**: guarda una copia con el nombre que elijas (por defecto `DEUDA A PAGAR ARG dd-mm-aaaa`) en la carpeta `Planillas exportadas`, al lado de la planilla. Usa `SaveCopyAs` de Excel, así que si está abierta incluye lo que tenga sin guardar; la planilla no cambia. Nunca pisa una exportada con el mismo nombre. Después de exportar se puede abrir la copia o deshacer (la borra si nadie la tocó). Para empezar de cero después, Reset.
 - Deshacer un lote que ya estaba deshecho no hace nada (antes, un segundo clic informaba como "cambió después" todo lo que ya había vuelto).
-- El botón Salir cierra la ventana de la app (si el navegador no la deja cerrarse, muestra "RUA EZ-Fac se cerró") y apaga el servidor; lo fuerza a los 1,5 segundos si algo lo retiene.
+- El botón Salir, en la punta derecha del encabezado (al lado del modo de trabajo), cierra la ventana de la app (si el navegador no la deja cerrarse, muestra "RUA EZ-Fac se cerró") y apaga el servidor; lo fuerza a los 1,5 segundos si algo lo retiene.
 
 ## Pantallas
 
@@ -204,7 +204,7 @@ Estructura de la carpeta de la app:
 
 ## Pruebas
 
-- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, Recibo y Nota de Venta, tarea vs precio, CUIT del emisor, No Gravado, ARCA sin período, Nota de Débito, IVA 10,5 %, PDF escaneado y con contraseña, original y duplicado en un PDF, zip con subcarpetas, .txt con dos CBU, mismo número contra las carpetas, archivos que no se movieron, memoria y reset que se deshacen, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
+- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, Recibo y Nota de Venta, tarea vs precio, CUIT del emisor, No Gravado, ARCA sin período, Factura B, Nota de Débito, IVA 10,5 %, PDF escaneado y con contraseña, original y duplicado en un PDF, zip con subcarpetas, .txt con dos CBU, mismo número contra las carpetas, archivos que no se movieron, memoria y reset que se deshacen, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
 - `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
 - Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Las dos usan openpyxl y tardan segundos. La prueba que abre Excel de verdad (COM) corre solo si se pide: `python -m pytest -q -m excel app\tests_privados` (un minuto y medio).
 - También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).

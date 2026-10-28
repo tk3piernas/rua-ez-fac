@@ -1,0 +1,476 @@
+"""Writing to DEUDA A PAGAR ARG.xlsx (stage 4).
+
+The logic (which row, what goes in each column, what to journal, how to undo) is written once
+against a small adapter. Two adapters exist:
+  * LibroCOM      desktop Excel through pywin32: the only one used on real files. Works whether
+                  the workbook is already open (it writes into that same Excel) or closed (it
+                  opens it in a hidden Excel, saves and closes).
+  * LibroOpenpyxl only for tests in the cloud, where there is no Excel.
+"""
+from __future__ import annotations
+
+import re
+import shutil
+from datetime import date, datetime
+from decimal import Decimal
+from pathlib import Path
+from urllib.parse import quote
+
+PRIMERA, ULTIMA = 12, 210
+COLS = "ABCDEFGHIJ"
+COLS_PROV = "ABCDEFGHIJKLMNO"
+AMARILLO = 13431551                      # light yellow (same as the PS1), BGR integer
+TEXTO_PROV = ("C", "G", "K", "L")        # CUIT, phone, account number, CBU: keep as text
+
+
+class ExcelError(Exception):
+    pass
+
+
+class LibroConCambios(ExcelError):
+    """The workbook is open with unsaved changes: the app never saves the user's work on its own."""
+
+
+def serial(d: date) -> float:
+    return float((d - date(1899, 12, 30)).days)
+
+
+def _col(c: str) -> int:
+    return ord(c) - 64
+
+
+# ======================================================================= adapters
+
+class LibroOpenpyxl:
+    """Test adapter (no Excel)."""
+
+    def __init__(self, ruta: Path):
+        import openpyxl
+        self.ruta = ruta
+        self.wb = openpyxl.load_workbook(ruta)
+        self.ya_abierto = False
+        self.saved = True
+
+    def hoja(self, nombre):
+        if nombre not in self.wb.sheetnames:
+            raise ExcelError(f"la planilla no tiene la hoja {nombre}")
+        return HojaOpenpyxl(self.wb[nombre])
+
+    def guardar(self):
+        self.wb.save(self.ruta)
+
+    def cerrar(self):
+        self.wb.close()
+
+
+class HojaOpenpyxl:
+    def __init__(self, ws):
+        self.ws = ws
+
+    def formula(self, r, c):
+        v = self.ws[f"{c}{r}"].value
+        if v is None:
+            return ""
+        if isinstance(v, datetime):
+            return serial(v.date())
+        return v
+
+    def valor(self, r, c):
+        return self.formula(r, c) if not str(self.formula(r, c)).startswith("=") else None
+
+    def poner(self, r, c, v, texto=False):
+        cell = self.ws[f"{c}{r}"]
+        if texto:
+            cell.number_format = "@"
+        cell.value = v if v != "" else None
+
+    def color(self, r, c):
+        f = self.ws[f"{c}{r}"].fill
+        return None if not f or f.fill_type is None else f.fgColor.rgb
+
+    def pintar(self, r, c, color):
+        from openpyxl.styles import PatternFill
+        self.ws[f"{c}{r}"].fill = PatternFill() if color is None else PatternFill("solid", fgColor=color if isinstance(color, str) else "FFFFF2CC")
+
+    def comentario(self, r, c):
+        cm = self.ws[f"{c}{r}"].comment
+        return cm.text if cm else None
+
+    def comentar(self, r, c, texto):
+        from openpyxl.comments import Comment
+        self.ws[f"{c}{r}"].comment = Comment(texto, "App Facturas") if texto else None
+
+
+class LibroCOM:
+    """Desktop Excel. Finds the workbook if it is already open (Running Object Table), else opens it hidden."""
+
+    def __init__(self, ruta: Path, url_onedrive: str = ""):
+        import pythoncom
+        import win32com.client
+        pythoncom.CoInitialize()
+        self.ruta = ruta
+        self.xl = None
+        self.nuevo = False
+        self.wb = self._buscar_abierto(ruta, url_onedrive)
+        self.ya_abierto = self.wb is not None
+        if not self.wb:
+            try:
+                self.xl = win32com.client.DispatchEx("Excel.Application")
+                self.nuevo = True
+                self.xl.Visible = False
+                self.xl.DisplayAlerts = False
+                self.wb = self.xl.Workbooks.Open(str(ruta), 0, False)
+            except Exception as e:
+                self.cerrar()
+                raise ExcelError(f"no pude abrir Excel: {e}") from e
+        if self.wb.ReadOnly:
+            self.cerrar()
+            raise ExcelError("la planilla está abierta en modo solo lectura (¿la tiene abierta otra persona?)")
+
+    @staticmethod
+    def _buscar_abierto(ruta: Path, url_onedrive: str):
+        import pythoncom
+        import win32com.client
+        destino = str(ruta).lower()
+        nombre_url = quote(ruta.name).lower()
+        rot = pythoncom.GetRunningObjectTable()
+        ctx = pythoncom.CreateBindCtx(0)
+        for m in rot:
+            try:
+                nombre = m.GetDisplayName(ctx, None)
+            except Exception:
+                continue
+            n = nombre.lower()
+            es = n == destino
+            # a OneDrive workbook opened in Excel is registered with its SharePoint URL
+            if not es and url_onedrive and n.startswith("http") and n.endswith("/" + nombre_url):
+                es = True
+            if es:
+                obj = rot.GetObject(m)
+                return win32com.client.Dispatch(obj.QueryInterface(pythoncom.IID_IDispatch))
+        return None
+
+    @property
+    def saved(self):
+        return bool(self.wb.Saved)
+
+    def hoja(self, nombre):
+        try:
+            return HojaCOM(self.wb.Worksheets(nombre))
+        except Exception as e:
+            raise ExcelError(f"la planilla no tiene la hoja {nombre}") from e
+
+    def guardar(self):
+        self.wb.Save()
+
+    def cerrar(self):
+        try:
+            if self.wb is not None and not self.ya_abierto:
+                self.wb.Close(False)
+            if self.xl is not None and self.nuevo:
+                self.xl.Quit()
+        except Exception:
+            pass
+        self.wb = self.xl = None
+
+
+class HojaCOM:
+    def __init__(self, ws):
+        self.ws = ws
+
+    def _c(self, r, c):
+        return self.ws.Range(f"{c}{r}")
+
+    def formula(self, r, c):
+        f = self._c(r, c).Formula
+        if isinstance(f, float) and f.is_integer():
+            return f
+        return f if f is not None else ""
+
+    def valor(self, r, c):
+        return self._c(r, c).Value2
+
+    def poner(self, r, c, v, texto=False):
+        cell = self._c(r, c)
+        if texto:
+            cell.NumberFormat = "@"
+        if isinstance(v, str) and v.startswith("="):
+            cell.Formula = v
+        elif v == "" or v is None:
+            cell.ClearContents()
+        else:
+            cell.Value2 = v
+
+    def color(self, r, c):
+        it = self._c(r, c).Interior
+        return None if it.ColorIndex == -4142 else int(it.Color)
+
+    def pintar(self, r, c, color):
+        it = self._c(r, c).Interior
+        if color is None:
+            it.ColorIndex = -4142
+        else:
+            it.Color = AMARILLO if color is True or isinstance(color, str) else color
+
+    def comentario(self, r, c):
+        cm = self._c(r, c).Comment
+        return cm.Text() if cm is not None else None
+
+    def comentar(self, r, c, texto):
+        cell = self._c(r, c)
+        if cell.Comment is not None:
+            cell.Comment.Delete()
+        if texto:
+            cell.AddComment(texto)
+
+
+def abrir(cfg, ruta: Path | None = None):
+    ruta = ruta or cfg.planilla
+    if not ruta or not ruta.exists():
+        raise ExcelError(f"no encuentro la planilla ({ruta})")
+    if getattr(cfg, "excel_motor", "com") == "openpyxl":
+        return LibroOpenpyxl(ruta)
+    try:
+        import win32com.client  # noqa: F401
+    except ImportError as e:
+        raise ExcelError("falta pywin32: corré 'Instalar o actualizar.bat'") from e
+    real = bool(cfg.base) and "onedrive" in str(ruta).lower()
+    return LibroCOM(ruta, url_onedrive=cfg.url_base if real else "")
+
+
+# ======================================================================= writing
+
+def _vacia(h, r) -> bool:
+    return all(h.formula(r, c) in ("", None) for c in "ABCDEFGJ")
+
+
+def _fila_libre(h, ocupadas: set) -> int | None:
+    for r in range(PRIMERA, ULTIMA + 1):
+        if r not in ocupadas and _vacia(h, r):
+            return r
+    return None
+
+
+def _hyperlink(url: str, texto: str) -> str:
+    q = lambda s: s.replace('"', '""')
+    return f'=HYPERLINK("{q(url)}","{q(texto)}")'
+
+
+def respaldar(ruta: Path, carpeta: Path) -> Path:
+    carpeta.mkdir(parents=True, exist_ok=True)
+    dest = carpeta / f"{datetime.now():%Y-%m-%d_%H%M%S} {ruta.name}"
+    shutil.copy2(ruta, dest)
+    return dest
+
+
+def escribir(cfg, lote, diario, backups: Path, guardar_cambios_usuario: bool = False, log=print) -> dict:
+    """Writes the batch rows and the new providers. Returns {"filas": n, "proveedores": n}."""
+    filas = [f for f in lote.filas if not f.excluida]
+    provs = lote.proveedores
+    if not filas and not provs:
+        return {"filas": 0, "proveedores": 0}
+    libro = abrir(cfg)
+    try:
+        if not libro.saved:
+            if not guardar_cambios_usuario:
+                raise LibroConCambios("la planilla está abierta con cambios sin guardar")
+            libro.guardar()
+        copia = respaldar(Path(cfg.planilla), backups)
+        diario.anotar({"op": "respaldo_excel", "ruta": str(copia)})
+        hojas = {}
+        ocupadas: dict[str, set] = {}
+        hechos: list[dict] = []
+        anotar = diario.anotar
+
+        def anotar_y_guardar(paso):
+            hechos.append(paso)
+            anotar(paso)
+        diario_anotar = anotar_y_guardar
+        try:
+            n, np = _escribir_todo(cfg, libro, filas, provs, hojas, ocupadas, diario_anotar, log)
+        except Exception:
+            # nothing half-written stays in the workbook: undo this run in memory and do not save
+            _revertir(libro, hechos)
+            anotar({"op": "excel_revertido"})
+            raise
+        libro.guardar()
+        diario.anotar({"op": "excel_guardado"})
+        return {"filas": n, "proveedores": np}
+    finally:
+        libro.cerrar()
+
+
+def _escribir_todo(cfg, libro, filas, provs, hojas, ocupadas, anotar, log):
+    """Each step is journaled BEFORE its cells are written, so a failure halfway can be reverted."""
+    n = 0
+    for f in filas:
+        h = hojas.setdefault(f.hoja, libro.hoja(f.hoja))
+        usadas = ocupadas.setdefault(f.hoja, set())
+        r = _fila_libre(h, usadas)
+        if r is None:
+            raise ExcelError(f"la hoja {f.hoja} está llena (fila {ULTIMA})")
+        usadas.add(r)
+        escrito: dict = {"A": f.proveedor}
+        texto = set()
+        if f.tarea:
+            escrito["B"] = f.tarea
+            texto.add("B")
+        if cfg.escribir_servicio and f.servicio:
+            escrito["C"] = f.servicio
+        if f.empresa:
+            escrito["D"] = f.empresa
+        if f.fecha:
+            escrito["E"] = serial(f.fecha)
+        if f.vto:
+            escrito["F"] = serial(f.vto)
+        if f.monto is not None:
+            escrito["G"] = float(f.monto)
+        if f.iva is not None:
+            escrito["H"] = float(f.iva)
+        if f.url:
+            escrito["J"] = _hyperlink(f.url, f.texto_link)
+        anotar({"op": "fila_excel", "libro": str(cfg.planilla), "hoja": f.hoja, "fila": r,
+                "antes": {c: h.formula(r, c) for c in COLS}, "escrito": escrito,
+                "colores": {c: h.color(r, c) for c in COLS} if f.resaltar else {},
+                "comentario_antes": h.comentario(r, "A") if f.comentario else None,
+                "comentado": bool(f.comentario), "factura": f.factura_id})
+        for c, v in escrito.items():
+            h.poner(r, c, v, texto=c in texto)
+        if f.resaltar:
+            for c in COLS:
+                h.pintar(r, c, True)
+        if f.comentario:
+            h.comentar(r, "A", f.comentario)
+        if str(h.formula(r, "A")) != f.proveedor:
+            raise ExcelError(f"verificación: la fila {r} de {f.hoja} no quedó bien")
+        log(f"EXCEL {f.hoja} fila {r}: {f.proveedor} | {f.texto_link} | {f.monto}")
+        n += 1
+    np = 0
+    if provs:
+        h = libro.hoja("Proveedores")
+        usadas = set()
+        for p in provs:
+            r = next((r for r in range(5, 301) if r not in usadas
+                      and all(h.formula(r, c) in ("", None) for c in COLS_PROV)), None)
+            if r is None:
+                raise ExcelError("la hoja Proveedores está llena")
+            usadas.add(r)
+            anotar({"op": "proveedor_excel", "libro": str(cfg.planilla), "fila": r,
+                    "valores": [str(v) for v in p["valores"]]})
+            for c, v in zip(COLS_PROV, p["valores"]):
+                if v not in ("", None):
+                    h.poner(r, c, str(v), texto=c in TEXTO_PROV)
+            log(f"EXCEL Proveedores fila {r}: {p['valores'][1]}")
+            np += 1
+    return n, np
+
+
+def _restaurar(libro, p, problemas, log) -> None:
+    if p["op"] == "fila_excel":
+        h = libro.hoja(p["hoja"])
+        r = p["fila"]
+        if str(h.formula(r, "A")) != str(p["escrito"]["A"]) or (
+                "J" in p["escrito"] and str(h.formula(r, "J")) != p["escrito"]["J"]):
+            problemas.append(f"{p['hoja']} fila {r} cambió después del lote; no la toco")
+            return
+        for c in p["escrito"]:
+            h.poner(r, c, p["antes"].get(c, ""))
+        for c, col in (p.get("colores") or {}).items():
+            h.pintar(r, c, col)
+        if p.get("comentado"):
+            h.comentar(r, "A", p.get("comentario_antes"))
+        log(f"EXCEL  borro {p['hoja']} fila {r}")
+    elif p["op"] == "proveedor_excel":
+        h = libro.hoja("Proveedores")
+        r = p["fila"]
+        if str(h.formula(r, "B")) != p["valores"][1]:
+            problemas.append(f"Proveedores fila {r} cambió después del lote; no la toco")
+            return
+        for c, v in zip(COLS_PROV, p["valores"]):
+            if v:
+                h.poner(r, c, "")
+        log(f"EXCEL  borro Proveedores fila {r}")
+
+
+def _revertir(libro, hechos) -> None:
+    for p in reversed(hechos):
+        try:
+            _restaurar(libro, p, [], lambda s: None)
+        except Exception:
+            pass
+
+
+def pasos_guardados(pasos: list[dict]) -> list[dict]:
+    """Excel steps that were actually saved (followed by 'excel_guardado' before any 'excel_revertido')."""
+    out, tanda = [], []
+    for p in pasos:
+        if p["op"] in ("fila_excel", "proveedor_excel"):
+            tanda.append(p)
+        elif p["op"] == "excel_guardado":
+            out += tanda
+            tanda = []
+        elif p["op"] == "excel_revertido":
+            tanda = []
+    return out
+
+
+def deshacer_excel(cfg, pasos: list[dict], log=print) -> list[str]:
+    """Undo the saved Excel steps of a batch (newest first). Only rows still as the app left them."""
+    pasos = pasos_guardados(pasos)
+    if not pasos:
+        return []
+    problemas: list[str] = []
+    libro = abrir(cfg, Path(pasos[0]["libro"]))
+    try:
+        if not libro.saved:
+            raise LibroConCambios("la planilla está abierta con cambios sin guardar: guardala y volvé a deshacer")
+        for p in reversed(pasos):
+            _restaurar(libro, p, problemas, log)
+        libro.guardar()
+    finally:
+        libro.cerrar()
+    return problemas
+
+
+# ======================================================================= clipboard
+
+def html_portapapeles(lote) -> tuple[str, str]:
+    """(HTML table, plain text) with the rows A:J, for pasting by hand if Excel cannot be opened."""
+    import html
+    css = "font-family:Arial;font-size:10pt"
+    filas_html, plano = [], []
+    for f in lote.filas:
+        if f.excluida:
+            continue
+        celdas = [f.proveedor, f.tarea, "", f.empresa,
+                  f.fecha.strftime("%d/%m/%Y") if f.fecha else "", f.vto.strftime("%d/%m/%Y") if f.vto else "",
+                  f"{f.monto:.2f}".replace(".", ",") if f.monto is not None else "",
+                  f"{f.iva:.2f}".replace(".", ",") if f.iva is not None else "", ""]
+        tds = "".join(f'<td style="{css}{";mso-number-format:\'@\'" if i == 1 else ""}">{html.escape(str(v))}</td>'
+                      for i, v in enumerate(celdas))
+        link = f'<td style="{css}"><a href="{html.escape(f.url)}">{html.escape(f.texto_link)}</a></td>'
+        filas_html.append(f"<tr>{tds}{link}</tr>")
+        plano.append("\t".join(celdas + [f.url]))
+    return "<table>" + "".join(filas_html) + "</table>", "\r\n".join(plano)
+
+
+def copiar_portapapeles(lote) -> None:
+    import win32clipboard
+    tabla, plano = html_portapapeles(lote)
+    pre = "<html><head><meta charset=\"utf-8\"></head><body><!--StartFragment-->"
+    post = "<!--EndFragment--></body></html>"
+    hdr = "Version:0.9\r\nStartHTML:{0:010d}\r\nEndHTML:{1:010d}\r\nStartFragment:{2:010d}\r\nEndFragment:{3:010d}\r\n"
+    largo = len(hdr.format(0, 0, 0, 0).encode())
+    sh = largo
+    sf = sh + len(pre.encode())
+    ef = sf + len(tabla.encode())
+    eh = ef + len(post.encode())
+    cf = (hdr.format(sh, eh, sf, ef) + pre + tabla + post).encode("utf-8")
+    fmt = win32clipboard.RegisterClipboardFormat("HTML Format")
+    win32clipboard.OpenClipboard()
+    try:
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(fmt, cf)
+        win32clipboard.SetClipboardText(plano, win32clipboard.CF_UNICODETEXT)
+    finally:
+        win32clipboard.CloseClipboard()

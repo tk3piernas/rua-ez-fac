@@ -1,0 +1,5 @@
+# Se instalan con --no-deps:
+# - PyMuPDF 2.0 pide onnxruntime (solo para funciones de IA que la app no usa), que no existe para Python 3.15.
+# - NiceGUI pide uvicorn[standard] (pyyaml), que no existe para Python 3.15; sus dependencias reales estan en requirements-ui.txt.
+pymupdf==2.0
+nicegui==3.18.0

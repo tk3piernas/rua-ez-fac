@@ -1,0 +1,5 @@
+# App Facturas RUA - librerias (versiones fijas). Etapa 4.
+# PyMuPDF se instala aparte, sin dependencias (ver requirements-nodeps.txt).
+openpyxl==3.1.5
+pytest==9.1.1
+pywin32==312; sys_platform == "win32"

@@ -1,0 +1,13 @@
+# entorno y datos locales: nunca al repo
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+datos/
+prueba/
+wheels/
+config.toml
+*.zip
+# facturas reales de prueba (CUIT, CBU de proveedores): solo en la PC de Matheo
+app/tests/fixtures/
+paridad/

@@ -1,6 +1,6 @@
 # Prompt: revisión de código de RUA EZ-Fac (para Claude Fable)
 
-Pegalo en una sesión nueva de Claude Code abierta en `C:\Users\mkouroussis\Documents\App Facturas`, con el modelo Fable.
+Pegalo en una sesión nueva de Claude Code abierta en `%USERPROFILE%\Documents\App Facturas`, con el modelo Fable.
 
 ---
 

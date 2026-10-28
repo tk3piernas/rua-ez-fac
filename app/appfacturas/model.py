@@ -79,8 +79,8 @@ class Extraccion:
     otros_tributos: Decimal | None = None
     no_gravado: Decimal | None = None    # "Importe Neto No Gravado" + "Importe Exento": paid, without IVA
     items: list[Item] = field(default_factory=list)
-    fiscal: bool = True              # False = no CUIT/CAE (e.g. "FAC0297" receipts)
-    numero_txt: str = ""             # number of a non-fiscal receipt ("FAC0297")
+    fiscal: bool = True              # False = no CUIT/CAE (e.g. "FAC0001" receipts)
+    numero_txt: str = ""             # number of a non-fiscal receipt ("FAC0001")
     cbu: str = ""                    # CBU printed on the invoice, if any
     tareas_archivo: list[str] = field(default_factory=list)   # task numbers in the file name (hint only)
     confianza: float = 0.0
@@ -118,6 +118,7 @@ class Factura:
     monto: Decimal | None = None      # G for the whole invoice (negative for NC)
     iva: Decimal | None = None        # H for the whole invoice (None = leave formula)
     dup: str = ""                     # certain duplicate: why it is not loaded
+    vto_supuesto: bool = False        # no due date in the PDF: F got the issue date
     posibles: list[str] = field(default_factory=list)   # possible duplicates (yellow)
 
 

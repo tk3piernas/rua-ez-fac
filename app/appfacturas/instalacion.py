@@ -55,8 +55,8 @@ def chequeo() -> tuple[bool, list[str]]:
         r.append('      o poné la ruta en config.toml > [rutas] facturas_pendientes.')
     else:
         r.append(f"OK    Facturas pendientes: {cfg.base}")
-        for sub in ([f"_Entrada\\{a}" for a in config.AREAS] + ["_Entrada\\_Duplicados", "_Entrada\\_Procesados"]
-                    + list(config.AREAS)):
+        from .preparar import SUBCARPETAS
+        for sub in (s.replace("/", "\\") for s in SUBCARPETAS if s != "_Script"):
             p = cfg.base.joinpath(*sub.split("\\"))
             r.append(f"{_ok(p.is_dir())} {sub}" + ("" if p.is_dir() else "  (Setup la crea)"))
         r.append(f"{_ok(cfg.csv_proveedores.is_file())} _Script\\proveedores.csv"

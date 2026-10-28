@@ -19,8 +19,14 @@ facturas_pendientes = ""
 planilla = ""
 # Base de los links de SharePoint (columna J). Vacía = se arma sola con tu cuenta de OneDrive de RUA
 url_base = ""
+# Dirección de SharePoint de la empresa (por ejemplo https://empresa-my.sharepoint.com): solo hace falta
+# si url_base queda vacía y Windows no da la dirección completa de tu OneDrive
+tenant = ""
 
 [reglas]
+# Palabras que van siempre en mayúsculas en el nombre de un proveedor nuevo (por ejemplo ["abc", "xyz"]).
+# SRL, SA, SAS y las siglas sin vocales ya van solas.
+siglas = []
 cuit_rua = "30717419428"
 # N° de tarea: 6 cifras dentro de este rango, solo en el detalle de la factura
 tarea_min = 300000
@@ -60,6 +66,7 @@ class Config:
     filas: str = "item"
     dias_vence_pronto: int = 7
     tolerancia_iva: float = 1.0
+    siglas: tuple = ()                    # words kept in capitals in new provider names ("ABC", "SOS"...)
     defaults: dict = field(default_factory=dict)
     escribir_servicio: bool = False
     puerto: int = 8765
@@ -95,10 +102,7 @@ def buscar_base() -> Path | None:
     return next((c for c in cands if c.is_dir()), None)
 
 
-TENANT = "https://ruaasistencia-my.sharepoint.com"
-
-
-def url_desde_onedrive(base: Path | None) -> str:
+def url_desde_onedrive(base: Path | None, tenant: str = "") -> str:
     """SharePoint URL of 'Facturas pendientes' for the signed-in OneDrive for Business account (Windows registry)."""
     if base is None or os.name != "nt":
         return ""
@@ -126,9 +130,9 @@ def url_desde_onedrive(base: Path | None) -> str:
         ep = v["ServiceEndpointUri"]
         if "/personal/" in ep:
             return ep.split("/_api")[0].rstrip("/") + "/Documents/" + base.name
-        if v["UserEmail"]:
+        if v["UserEmail"] and tenant:
             usuario = v["UserEmail"].lower().replace("@", "_").replace(".", "_")
-            return f"{TENANT}/personal/{usuario}/Documents/{base.name}"
+            return f"{tenant.rstrip('/')}/personal/{usuario}/Documents/{base.name}"
     return ""
 
 
@@ -145,13 +149,14 @@ def cargar(ruta: Path | None = None, base: Path | None = None) -> Config:
         c.planilla = Path(r["planilla"])
     elif c.base:
         c.planilla = c.base.parent / "DEUDA A PAGAR ARG.xlsx"
-    c.url_base = r.get("url_base", "") or url_desde_onedrive(c.base)
+    c.url_base = r.get("url_base", "") or url_desde_onedrive(c.base, r.get("tenant", ""))
     c.cuit_rua = str(g.get("cuit_rua", c.cuit_rua))
     c.tarea_min = int(g.get("tarea_min", c.tarea_min))
     c.tarea_max = int(g.get("tarea_max", c.tarea_max))
     c.filas = g.get("filas", c.filas) if g.get("filas") in ("item", "factura") else "item"
     c.dias_vence_pronto = int(g.get("dias_vence_pronto", c.dias_vence_pronto))
     c.tolerancia_iva = float(g.get("tolerancia_iva", c.tolerancia_iva))
+    c.siglas = tuple(str(x).lower() for x in g.get("siglas", []) if x)
     c.defaults = {k: v for k, v in pl.items() if v and isinstance(v, str)}
     c.escribir_servicio = bool(pl.get("escribir_servicio", False))
     c.puerto = int(ap.get("puerto", c.puerto))

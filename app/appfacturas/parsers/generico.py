@@ -1,8 +1,8 @@
 """Invoices that are not the ARCA layout.
 
-Covers fiscal invoices made with other software (MDQ: "Punto de Venta:00002", "Comprobante N°:";
-Santiago SOS: "Nº: 0009-00001418", "Neto:", "Fecha de venc. de pago:") and non-fiscal
-receipts without CUIT or CAE (ABC Soluciones: "Número: FAC0297", "Fecha: jun 13, 2026").
+Covers fiscal invoices made with other billing software ("Punto de Venta:00002" + "Comprobante N°:";
+or "Nº: 0001-00000001", "Neto:", "Fecha de venc. de pago:") and non-fiscal receipts without CUIT
+or CAE ("Número: FAC0001", "Fecha: jun 13, 2026").
 
 It works on lines rebuilt from the page positions, so the text order inside the PDF does not
 matter. Confidence is lower than ARCA's: the result always goes to review."""
@@ -112,7 +112,8 @@ class Generico(Parser):
         e.cuit = min(cuits, key=lambda c: puntaje[c]) if cuits else ""
         if len(cuits) > 1:
             e.notas.append(f"hay varios CUIT ({', '.join(cuits)}); tomé {e.cuit} como el del proveedor")
-        e.cuit_receptor = cfg.cuit_rua if re.search(r"30-?71741942-?8", texto) else ""
+        c = cfg.cuit_rua
+        e.cuit_receptor = c if re.search(rf"(?<!\d){c[:2]}-?{c[2:10]}-?{c[10:]}(?!\d)", texto) else ""
         e.condicion_receptor = _buscar(r"(?i)I\.?V\.?A\.?:\s*(Responsable Inscripto|Consumidor Final|Exento|Monotributo)", texto)
         cae = bool(re.search(r"(?i)\bC\.?A\.?E\.?\b", texto))
         e.fiscal = bool(e.cuit) and e.nro is not None and cae

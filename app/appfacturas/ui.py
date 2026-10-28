@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import socket
 import sys
+import time
 import webbrowser
 from datetime import date
 from pathlib import Path
@@ -12,9 +13,10 @@ from pathlib import Path
 from nicegui import app, run, ui
 
 from . import NOMBRE, __version__, config, ejecutor, excel, reporte
-from .lote import Armador, Entrada, aplicar_exclusiones, entradas_de_carpeta
+from .lote import (Armador, Entrada, aplicar_exclusiones, entradas_de_carpeta, iva_al_editar_monto,
+                   renombrar_proveedor)
 from .model import Estado, Nivel
-from .util import ahora_id, fmt_fecha, fmt_monto, parse_fecha, parse_monto, sha256
+from .util import ahora_id, fmt_fecha, fmt_monto, parse_fecha, parse_monto, relativa, sha256
 
 CSS = """
 :root { --navy: #14147a; --naranja: #ff542c; --linea: #e3e6f0; }
@@ -52,8 +54,7 @@ body { background: linear-gradient(180deg, #e9ebf7 0px, #f6f7fc 320px) fixed; co
 .fila-violeta { background-color: #efe7fb !important; }
 .fila-excluida { color: #9aa0a6 !important; text-decoration: line-through; }
 .contenido { width: 100%; max-width: 1600px; margin: 0 auto; padding-bottom: 140px; }
-.alfa { position: fixed; right: 18px; bottom: 18px; z-index: 2000; width: 300px; border-radius: 18px; background: #fff;
-        border: 1px solid #f6d5c8; box-shadow: 0 12px 32px rgba(20,20,122,.18) !important; }
+.alfa { background: #ff542c; color: #fff; border-radius: 999px; padding: 2px 10px 2px 3px; margin-left: 6px; cursor: default; }
 .q-dialog .seccion { overflow-y: auto; max-height: 88vh; }
 .dialogo-botones { position: sticky; bottom: -24px; background: #fff; padding: 10px 0 4px; z-index: 1;
                    border-top: 1px solid var(--linea); }
@@ -111,6 +112,17 @@ def de_a_uno(fn):
     return envuelta
 
 
+async def con_espera(mensaje: str, fn, *args):
+    """A long task: spinner while it runs, and the action buttons disabled (S.ocupado) until it ends."""
+    n = ui.notification(mensaje, spinner=True, timeout=None)
+    previo, S.ocupado = S.ocupado, True
+    try:
+        return await run.io_bound(fn, *args)
+    finally:
+        S.ocupado = previo
+        n.dismiss()
+
+
 def mientras_libre(boton):
     """Button disabled while something is running."""
     return boton.bind_enabled_from(S, "ocupado", backward=lambda o: not o)
@@ -140,6 +152,14 @@ def cfg_activa() -> config.Config:
 
 def puede_escribir(cfg) -> bool:
     return S.usar_prueba or cfg.modo_real
+
+
+INICIO = time.time()                         # files uploaded before this moment come from another session
+
+
+def lista_subidos() -> list[Path]:
+    sub = carpeta_subidos()
+    return sorted((f for f in sub.rglob("*") if f.is_file()), key=lambda f: (f.parent.name, f.name.lower())) if sub.exists() else []
 
 
 def quitar_subidos() -> tuple[int, int]:
@@ -252,7 +272,7 @@ def aplicar_edicion(lote, args: dict) -> str | None:
         return None
     r.editada = True
     if col == "proveedor":
-        r.proveedor = str(v or "").strip()
+        return renombrar_proveedor(lote, S.cfg, r.factura_id, str(v or ""))
     elif col == "tarea":
         r.tarea = str(v or "").strip()
     elif col == "servicio":
@@ -266,7 +286,11 @@ def aplicar_edicion(lote, args: dict) -> str | None:
         m = parse_monto(str(v)) if v not in (None, "") else None
         if v not in (None, "") and m is None:
             return f"No entiendo el monto '{v}'"
+        antes = r.iva
         r.monto = m
+        r.iva = iva_al_editar_monto(lote, r)
+        if antes not in (None, 0) and r.iva is None:
+            return "Cambió el monto: H vuelve a la fórmula de la planilla (el IVA leído era del monto anterior)"
     return None
 
 
@@ -287,6 +311,7 @@ def pagina():
             with ui.column().classes("gap-0"):
                 ui.label(NOMBRE).classes("text-xl font-bold leading-tight")
                 ui.label(f"Carga de facturas de proveedores · v{__version__}").classes("text-xs opacity-75")
+            aviso_alfa()
             with ui.row().classes("items-center gap-1 ml-4"):
                 ui.button("Abrir planilla", icon="table_view", on_click=abrir_planilla).props("flat color=white").tooltip(
                     "Abre en Excel la planilla en la que está escribiendo la app (la real o la copia de prueba)")
@@ -328,18 +353,14 @@ def pagina():
             with ui.tab_panel(t_conf).classes("items-center"):
                 panel_config(refrescar_modo)
     refrescar_modo()
-    aviso_alfa()
 
 
 def aviso_alfa() -> None:
-    with ui.card().classes("alfa p-3") as tarjeta_alfa:
-        with ui.row().classes("w-full items-center no-wrap gap-3"):
-            ui.image("/ezfac/simba.png").classes("w-20 h-20 shrink-0 rounded-xl").props("fit=cover")
-            with ui.column().classes("gap-0 grow"):
-                ui.label("¡ESTO ES UNA ALPHA!").classes("font-bold text-base").style("color: var(--navy)")
-                ui.label("Mandar bugs y sugerencias a Matheo").classes("text-sm text-gray-600")
-            ui.button(icon="close", on_click=lambda: tarjeta_alfa.set_visibility(False)).props(
-                "flat round dense size=sm color=grey-7").classes("self-start")
+    with ui.row().classes("alfa items-center gap-2 no-wrap"):
+        ui.image("/ezfac/simba.png").classes("w-7 h-7 rounded-full").props("fit=cover")
+        ui.label("ALPHA").classes("font-bold text-xs")
+        with ui.tooltip().classes("text-sm"):
+            ui.label("¡Esto es una alpha! Mandá bugs y sugerencias a Matheo.")
 
 
 # ------------------------------------------------------------------ Cargar
@@ -351,6 +372,10 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                              value="", label="Área de lo que subís").classes("w-72")
 
             async def subido(e):
+                if Path(e.file.name).suffix.lower() == ".txt" and not area.value:
+                    ui.notify(f"{e.file.name}: para los .txt elegí el área arriba (no se puede detectar por "
+                              "proveedor). No lo subí.", type="warning", multi_line=True)
+                    return
                 dest = carpeta_subidos() / (area.value or "_Detectar")
                 dest.mkdir(parents=True, exist_ok=True)
                 await e.file.save(dest / Path(e.file.name).name)
@@ -370,10 +395,30 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                         with ui.row().classes("gap-2 items-baseline"):
                             ui.label(etiqueta).classes("text-sm text-gray-600")
                             ui.label(str(n)).classes("text-xl font-bold").style("color: var(--navy)")
+                    subidos = lista_subidos()
+                    viejos = [f for f in subidos if f.stat().st_mtime < INICIO]
+                    if viejos:
+                        ui.label(f"Quedaron {len(viejos)} archivos subidos en otra sesión: se suman al próximo "
+                                 "lote. Quitalos si no van.").classes("text-xs text-amber-700 text-center")
+                    with ui.column().classes("gap-0 w-full"):
+                        for f in subidos:
+                            with ui.row().classes("items-center gap-1 no-wrap w-full"):
+                                ui.label(f"{f.parent.name.replace('_Detectar', 'Detectar')} · {f.name}").classes(
+                                    "text-xs text-gray-700 truncate grow" + (" text-amber-700" if f in viejos else ""))
+                                ui.button(icon="close", on_click=lambda f=f: quitar_uno(f)).props(
+                                    "flat round dense size=xs").tooltip("Quitar este archivo")
                     b = ui.button("Quitar lo subido", icon="delete_sweep", on_click=vaciar_subidos).props("flat dense")
                     if not c.get("subidos"):
                         b.disable()
                         b.tooltip("No hay nada subido acá")
+
+            def quitar_uno(f: Path):
+                try:
+                    f.unlink()
+                    ui.notify(f"Quité {f.name}", type="positive")
+                except OSError as ex:
+                    ui.notify(f"No pude quitar {f.name}: {ex}", type="warning")
+                contar.refresh()
 
             def vaciar_subidos():
                 n, quedan = quitar_subidos()
@@ -473,7 +518,9 @@ def panel_revision(tabs=None, t_res=None):
             def editado(e):
                 err = aplicar_edicion(lote, e.args)
                 if err:
-                    ui.notify(err, type="warning")
+                    ui.notify(err, type="warning", multi_line=True)
+                grid.options["rowData"] = filas_grid(lote)     # other rows of the provider, H, undone edits
+                grid.update()
                 resumen.refresh()
                 total_filas.refresh()
             grid.on("cellValueChanged", editado)
@@ -529,10 +576,7 @@ def panel_revision(tabs=None, t_res=None):
 
 
 def _rel(p, cfg) -> str:
-    try:
-        return str(Path(p).relative_to(cfg.base))
-    except Exception:
-        return str(p)
+    return relativa(p, cfg.base)
 
 
 async def copiar():
@@ -549,6 +593,10 @@ async def confirmar(tabs, t_res):
     excluidas = aplicar_exclusiones(lote)
     act = [r for r in lote.filas if not r.excluida]
     movs = len([p for p in lote.plan if p["op"] in ("mover", "copiar", "mover_zip", "a_duplicados", "txt_procesado")])
+    hay_avisos = any(a.nivel in (Nivel.REVISAR, Nivel.BLOQUEA) for a in lote.avisos)
+    if not hay_avisos and not excluidas:
+        await _confirmado(tabs, t_res, lote, cfg)
+        return
     with ui.dialog() as dlg, ui.card().classes("items-center"):
         ui.label("¿Confirmo?").classes("text-lg font-bold")
         ui.label(f"Se mueven {movs} archivos y se escriben {len(act)} filas "
@@ -560,7 +608,12 @@ async def confirmar(tabs, t_res):
             ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
     if not await dlg:
         return
-    n = ui.notification("Cargando…", spinner=True, timeout=None)
+    await _confirmado(tabs, t_res, lote, cfg)
+
+
+async def _confirmado(tabs, t_res, lote, cfg):
+    n = ui.notification("Cargando en " + ("la COPIA de prueba…" if S.usar_prueba else "la planilla REAL…"),
+                        spinner=True, timeout=None)
     try:
         S.resultado = await run.io_bound(lambda: ejecutor.Ejecutor(cfg, lote, S.trabajo, log=lambda s: None,
                                                                     modo="prueba" if S.usar_prueba else "real").ejecutar())
@@ -577,7 +630,7 @@ async def confirmar(tabs, t_res):
                 ui.button("Guardar mis cambios y escribir", on_click=lambda: d2.submit(True)).props("color=positive")
                 ui.button("Dejar pendientes", on_click=lambda: d2.submit(False)).props("flat")
         if await d2:
-            est, msg = await run.io_bound(ejecutor.reintentar_excel, cfg, S.trabajo, True, lambda s: None)
+            est, msg = await con_espera("Guardando tus cambios y escribiendo las filas…", ejecutor.reintentar_excel, cfg, S.trabajo, True, lambda s: None)
             S.resultado["excel"], S.resultado["excel_mensaje"] = est, msg
     panel_resultado.refresh()
     panel_historial.refresh()
@@ -608,6 +661,13 @@ async def continuar(trabajo: Path, con_archivos: bool = True):
         S.resultado["hechos"] = S.resultado.get("hechos", []) + r["hechos"]
     panel_resultado.refresh()
     panel_historial.refresh()
+
+
+def fecha_lote(lid: str) -> str:
+    """'2026-10-28_104143' -> '28/10/2026 10:41' (the id itself if it has another shape)."""
+    import re
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})", lid)
+    return f"{m[3]}/{m[2]}/{m[1]} {m[4]}:{m[5]}" if m else lid
 
 
 def texto_donde(trabajo: Path) -> str:
@@ -656,7 +716,7 @@ def panel_resultado():
                 if est.get("excel") == "pendiente":
                     @de_a_uno
                     async def reintentar():
-                        e2, msg = await run.io_bound(ejecutor.reintentar_excel, S.cfg, S.trabajo, False, lambda s: None)
+                        e2, msg = await con_espera("Escribiendo las filas…", ejecutor.reintentar_excel, S.cfg, S.trabajo, False, lambda s: None)
                         S.resultado["excel"], S.resultado["excel_mensaje"] = e2, msg
                         ui.notify("Filas escritas" if e2 == "escrito" else f"Siguen pendientes: {msg}",
                                   type="positive" if e2 == "escrito" else "warning")
@@ -681,7 +741,7 @@ async def deshacer(trabajo: Path):
         return
     pagina_ = ui.context.client.layout          # the button may be gone when the undo ends (panels refresh)
     try:
-        problemas = await run.io_bound(lambda: ejecutor.deshacer(trabajo, log=lambda s: None, cfg=S.cfg))
+        problemas = await con_espera("Deshaciendo el lote…", lambda: ejecutor.deshacer(trabajo, log=lambda s: None, cfg=S.cfg))
     except ejecutor.YaDeshecho as ex:
         with pagina_:
             ui.notify(f"No hice nada: {ex}.", type="info")
@@ -716,9 +776,9 @@ def panel_historial():
         for x in lotes[:40]:
             e = ejecutor.estado(x)
             modo = ejecutor.donde(x)[0] if e.get("estado") else ""
-            filas.append({"lote": x.name, "estado": ejecutor.etiqueta(x), "donde": modo.upper(),
+            filas.append({"lote": fecha_lote(x.name), "estado": ejecutor.etiqueta(x), "donde": modo.upper(),
                           "planilla": e.get("excel", ""), "errores": len(e.get("errores", []))})
-        ui.aggrid({"columnDefs": [{"field": "lote", "headerName": "Lote", "width": 180},
+        ui.aggrid({"columnDefs": [{"field": "lote", "headerName": "Fecha", "width": 160},
                                   {"field": "estado", "headerName": "Estado", "width": 200},
                                   {"field": "donde", "headerName": "Dónde", "width": 100},
                                   {"field": "planilla", "headerName": "Planilla", "width": 150},
@@ -767,9 +827,10 @@ async def dialogo_exportar():
 
         hecho = {}
 
+        @de_a_uno
         async def exportar():
             try:
-                destino = await run.io_bound(preparar.exportar_planilla, cfg, nombre.value)
+                destino = await con_espera("Exportando la planilla…", preparar.exportar_planilla, cfg, nombre.value)
             except Exception as ex:
                 ui.notify(f"No pude exportar: {ex}", type="negative", multi_line=True)
                 return
@@ -787,7 +848,7 @@ async def dialogo_exportar():
         def botones():
             with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
                 if not hecho:
-                    ui.button("Exportar", icon="file_download", on_click=exportar).props("color=secondary unelevated")
+                    mientras_libre(ui.button("Exportar", icon="file_download", on_click=exportar).props("color=secondary unelevated"))
                     ui.button("Cancelar", on_click=dlg.close).props("flat")
                     return
                 import os
@@ -811,6 +872,7 @@ def historiales_memoria() -> list[Path]:
     return [hist_memoria()] + sorted((datos() / "lotes").glob(f"*/{ejecutor.HIST_MEMORIA}"))
 
 
+@ui.refreshable
 def panel_proveedores():
     """Paste a provider's details, check them and keep them in PROVEEDORES RUA.xlsx (the provider memory)."""
     from . import maestro
@@ -823,6 +885,7 @@ def panel_proveedores():
         F["vals"], F["avisos"] = maestro.desde_texto(texto.value, area.value)
         ficha.refresh()
 
+    @de_a_uno
     async def guardar():
         cfg = S.cfg
         if not puede_escribir(cfg):
@@ -833,7 +896,7 @@ def panel_proveedores():
             ui.notify("Falta el nombre o el CUIT del proveedor", type="warning")
             return
         try:
-            cambios = await run.io_bound(maestro.guardar, cfg, [(F["vals"], False)], hist_memoria(), "pegado a mano")
+            cambios = await con_espera("Guardando en la memoria…", maestro.guardar, cfg, [(F["vals"], False)], hist_memoria(), "pegado a mano")
         except Exception as ex:
             ui.notify(f"No pude guardar: {ex}", type="negative", multi_line=True)
             return
@@ -851,7 +914,7 @@ def panel_proveedores():
             ui.notify("No hay cambios para deshacer", type="info")
             return
         try:
-            problemas = await run.io_bound(lambda: maestro.deshacer(S.cfg, u[0], id_=u[1]["id"]))
+            problemas = await con_espera("Deshaciendo el cambio…", lambda: maestro.deshacer(S.cfg, u[0], id_=u[1]["id"]))
         except Exception as ex:
             ui.notify(f"No pude deshacer: {ex}", type="negative", multi_line=True)
             return
@@ -902,7 +965,7 @@ def panel_proveedores():
                         ui.label("Proveedor nuevo en la memoria").classes("text-sm font-bold")
                 with ui.column().classes("w-full gap-0"):
                     chequeo()
-                ui.button("Guardar en la memoria", icon="save", on_click=guardar).props("color=primary unelevated")
+                mientras_libre(ui.button("Guardar en la memoria", icon="save", on_click=guardar).props("color=primary unelevated"))
             ficha()
 
     @ui.refreshable
@@ -952,7 +1015,7 @@ def panel_config(refrescar_modo):
         with seccion("Setup", "construction", "w-[760px]"):
             ui.label("Crea las carpetas que falten (en la app y en tu OneDrive de RUA), una planilla vacía si no "
                      "tenés, y revisa que esté todo bien. Nunca pisa nada que ya exista.").classes("text-sm text-gray-600 text-center")
-            ui.button("Revisar y preparar todo", icon="construction", on_click=dialogo_setup).props(
+            mientras_libre(ui.button("Revisar y preparar todo", icon="construction", on_click=dialogo_setup)).props(
                 "color=secondary unelevated size=md").classes("px-5")
 
         with seccion("Modo de trabajo", "tune", "w-[760px]"):
@@ -977,6 +1040,16 @@ def panel_config(refrescar_modo):
             async def elegir(modo: str):
                 if modo == modo_actual():
                     return
+                if S.lote is not None:
+                    with ui.dialog() as dlg0, ui.card().classes("items-center"):
+                        ui.label("Hay un lote leído sin confirmar").classes("font-bold")
+                        ui.label("Si cambiás de modo se descarta, con lo que hayas editado en la grilla. "
+                                 "Los archivos no se tocan: lo podés volver a leer.").classes("text-sm text-center")
+                        with ui.row().classes("justify-center"):
+                            ui.button("Cambiar igual", on_click=lambda: dlg0.submit(True)).props("color=negative")
+                            ui.button("Cancelar", on_click=lambda: dlg0.submit(False)).props("flat")
+                    if not await dlg0:
+                        return
                 if modo == "real":
                     with ui.dialog() as dlg, ui.card().classes("items-center"):
                         ui.label("¿Paso a cargar en la planilla REAL?").classes("font-bold")
@@ -992,6 +1065,7 @@ def panel_config(refrescar_modo):
                 S.cfg = cfg_activa()
                 S.lote = None
                 panel_revision.refresh()
+                panel_proveedores.refresh()          # its memory file depends on the mode
                 refrescar_modo()
                 selector.refresh()
                 ui.notify(f"Modo: {MODOS[modo][0]}")
@@ -1012,12 +1086,13 @@ def panel_config(refrescar_modo):
                                     ui.label(texto).classes("text-sm text-gray-600").style("overflow-wrap: anywhere; word-break: normal")
             selector()
 
+            @de_a_uno
             async def rearmar():
                 from . import paridad
-                await run.io_bound(paridad.preparar)
+                await con_espera("Rearmando la carpeta de prueba…", paridad.preparar)
                 ui.notify("Carpeta de prueba rearmada con una copia de la planilla y el lote de prueba", type="positive")
             with ui.row().classes("justify-center items-center gap-3"):
-                ui.button("Rearmar la carpeta de prueba", icon="restart_alt", on_click=rearmar).props("outline")
+                mientras_libre(ui.button("Rearmar la carpeta de prueba", icon="restart_alt", on_click=rearmar).props("outline"))
             ui.label(f"Facturas pendientes (real): {cfg_real.base} · Configuración: {cfg_real.archivo}").classes(
                 "text-xs text-gray-500 text-center break-all")
 
@@ -1065,12 +1140,13 @@ def mostrar_chequeo(lineas: list[str]) -> None:
 F_setup = {"nueva": False}
 
 
+@de_a_uno
 async def dialogo_setup():
     from . import instalacion, preparar
     cfg_real = config.cargar()
     F_setup["nueva"] = False
-    plan = await run.io_bound(preparar.plan_setup, cfg_real)
-    ok, lineas = await run.io_bound(instalacion.chequeo)
+    plan = await con_espera("Revisando la PC…", preparar.plan_setup, cfg_real)
+    ok, lineas = await con_espera("Revisando la PC…", instalacion.chequeo)
     with ui.dialog() as dlg, ui.card().classes("seccion w-[760px] max-w-full gap-3 p-6"):
         ui.label("Setup").classes("titulo-seccion")
 
@@ -1105,6 +1181,7 @@ async def dialogo_setup():
             mostrar_chequeo(lineas)
         cuerpo()
 
+        @de_a_uno
         async def crear():
             nonlocal plan, ok, lineas
             if plan["hojas"] and not cfg_real.modo_real:
@@ -1112,14 +1189,14 @@ async def dialogo_setup():
                           "(Configuración). Ahora creo solo las carpetas y archivos.", type="warning", multi_line=True)
                 plan = {**plan, "hojas": []}
             try:
-                hecho = await run.io_bound(preparar.ejecutar_setup, cfg_real, plan,
+                hecho = await con_espera("Creando lo que falta…", preparar.ejecutar_setup, cfg_real, plan,
                                            bool(F_setup["nueva"] and not plan.get("onedrive_sin_bajar")))
             except Exception as ex:
                 ui.notify(f"No pude crear todo: {ex}", type="negative", multi_line=True)
                 return
             ui.notify(f"Listo: {len(hecho)} cosas creadas", type="positive")
-            plan = await run.io_bound(preparar.plan_setup, config.cargar())
-            ok, lineas = await run.io_bound(instalacion.chequeo)
+            plan = await con_espera("Revisando la PC…", preparar.plan_setup, config.cargar())
+            ok, lineas = await con_espera("Revisando la PC…", instalacion.chequeo)
             S.cfg = cfg_activa()
             cuerpo.refresh()
             btn.set_visibility(bool(plan["dirs"] or plan["archivos"] or plan["hojas"] or plan.get("planilla_nueva")))
@@ -1153,7 +1230,7 @@ async def volver_reset():
     if not await dlg:
         return
     try:
-        await run.io_bound(preparar.volver_del_reset, S.cfg, datos() / "backups", lambda s: None)
+        await con_espera("Volviendo al respaldo del reset…", preparar.volver_del_reset, S.cfg, datos() / "backups", lambda s: None)
     except Exception as ex:
         ui.notify(f"No pude volver (no se cambió nada): {ex}", type="negative", multi_line=True)
         return
@@ -1244,8 +1321,25 @@ def _version_corriendo(url: str) -> str:
         return ""                     # versions before 0.5.2 have no /api/version
 
 
+def es_esta_app(linea: str) -> bool:
+    """Only a python process running this app is closed (another program on the same port is left alone)."""
+    linea = (linea or "").lower()
+    return "python" in linea and "appfacturas" in linea
+
+
+def _linea_de_comando(pid: str) -> str:
+    import subprocess
+    try:
+        return subprocess.run(["powershell", "-NoProfile", "-Command",
+                               f"(Get-CimInstance Win32_Process -Filter 'ProcessId={int(pid)}').CommandLine"],
+                              capture_output=True, text=True, timeout=10,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+    except Exception:
+        return ""
+
+
 def _cerrar_viejo(puerto: int) -> bool:
-    """Kill the old app still listening on the port (only if it is a python process)."""
+    """Kill the old app still listening on the port (only if it is this app: python running appfacturas)."""
     import subprocess
     import time
     if sys.platform != "win32":
@@ -1262,9 +1356,7 @@ def _cerrar_viejo(puerto: int) -> bool:
         if len(c) >= 5 and c[1].endswith(f":{puerto}") and c[3].upper() in ("LISTENING", "ESCUCHANDO"):
             pids.add(c[4])
     for pid in pids:
-        t = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"], capture_output=True,
-                           text=True, creationflags=sin_ventana).stdout.lower()
-        if "python" in t:
+        if es_esta_app(_linea_de_comando(pid)):
             subprocess.run(["taskkill", "/PID", pid, "/F"], capture_output=True, creationflags=sin_ventana)
     for _ in range(25):
         if not _puerto_ocupado(puerto):

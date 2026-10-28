@@ -7,7 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from .model import Estado, Lote, Nivel, a_json
-from .util import fmt_fecha, fmt_monto
+from .util import fmt_fecha, fmt_monto, relativa
 
 
 def texto(lote: Lote, cfg) -> str:
@@ -89,10 +89,7 @@ def texto(lote: Lote, cfg) -> str:
 
 
 def _rel(p: Path, base) -> str:
-    try:
-        return str(p.relative_to(base))
-    except Exception:
-        return str(p)
+    return relativa(p, base)
 
 
 def paridad_csv(lote: Lote, ruta: Path) -> None:

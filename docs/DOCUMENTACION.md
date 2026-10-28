@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.9.5 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.10.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -61,7 +61,7 @@ Estructura de la carpeta de la app:
 - **Instalar en otra PC:**
   1. En la PC que ya tiene la app, correr `Armar instalador para otra PC.bat`. El zip no lleva pruebas, datos, configuración ni facturas.
   2. En la otra PC, descomprimirlo en Documentos y abrir el instalador.
-  3. El link de SharePoint de la columna J sale de la cuenta de OneDrive de esa PC: registro `HKCU\Software\Microsoft\OneDrive\Accounts\BusinessN`, `ServiceEndpointUri` o `UserEmail`. Si en `config.toml` se deja `url_base` vacío, se arma solo.
+  3. El link de SharePoint de la columna J sale de la cuenta de OneDrive de esa PC: registro `HKCU\Software\Microsoft\OneDrive\Accounts\BusinessN`, `ServiceEndpointUri` o, si no está, `UserEmail` más la dirección de SharePoint de la empresa (`[rutas] tenant` en `config.toml`; no está escrita en el código). Si en `config.toml` se deja `url_base` vacío, se arma solo.
 
 ## Cómo arranca
 
@@ -78,16 +78,18 @@ Estructura de la carpeta de la app:
 
 1. **Cargar:**
    - Área de lo que subís: Vehicular, Hogar, Persona, ServiciosYa o detectar por proveedor.
-   - Subir archivos: se copian a `datos\entrada_ui`; los originales quedan donde estaban.
-   - Cuánto hay para leer.
+   - Subir archivos: se copian a `datos\entrada_ui`; los originales quedan donde estaban. Un .txt necesita el área elegida (no se detecta por proveedor): si no, no se sube y lo avisa.
+   - Cuánto hay para leer, y la lista de lo subido con una X para quitar cada archivo. Si quedaron archivos subidos en otra sesión, lo avisa en naranja (se suman al próximo lote).
    - Botón Leer facturas: no mueve ni escribe nada.
 2. **Revisión:**
    - Resumen del lote y avisos.
    - Grilla editable: Cargar, Proveedor, fechas, N° de tarea, Servicio y Monto. Colores: amarillo = posible duplicado, rojo = frenada, violeta = leída por Claude.
+     - Editar **Proveedor** de un proveedor nuevo lo cambia en todo: carpeta, línea de `proveedores.csv`, links y filas de todas sus facturas del lote. Uno ya registrado no se cambia acá (avisa que se corrige en `proveedores.csv`).
+     - Editar **Monto**: en Factura B, C o no fiscal H sigue en 0; en Factura A, H vuelve a la fórmula (el IVA leído era del monto anterior) y lo avisa.
    - Secciones de lo que no se carga, los proveedores nuevos y los archivos que se mueven.
-   - Botones Confirmar y Copiar al portapapeles.
+   - Botones Confirmar y Copiar al portapapeles. Si no hay avisos para revisar ni que frenen y nada excluido, Confirmar carga directo (sin el "¿Confirmo?"); si hay, pregunta.
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
-4. **Historial:** los lotes anteriores, con la columna **Dónde** (PRUEBA o REAL) y el estado. Un lote que quedó "en curso" porque se cerró la app a mitad aparece como **quedó a medias**. Para el último lote: **Terminar este lote** (si quedó a medias o con cosas pendientes) y **Deshacer**, que dice sobre qué planilla actúa.
+4. **Historial:** los lotes anteriores, con la fecha legible (28/10/2026 10:41), la columna **Dónde** (PRUEBA o REAL) y el estado. Un lote que quedó "en curso" porque se cerró la app a mitad aparece como **quedó a medias**. Para el último lote: **Terminar este lote** (si quedó a medias o con cosas pendientes) y **Deshacer**, que dice sobre qué planilla actúa.
 5. **Proveedores** (`maestro.py`): memoria de datos de proveedores en `PROVEEDORES RUA.xlsx`.
    - Cuadro para pegar texto (mail, WhatsApp, .txt): lo lee el mismo lector de los .txt y arma una ficha editable con chequeos (dígito verificador de CUIT y CBU, banco del CBU). Si el proveedor ya está, muestra qué cambia.
    - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita el modo "Cargar en la planilla real" o "Practicar en la carpeta de prueba".
@@ -102,7 +104,10 @@ Estructura de la carpeta de la app:
      - Se guarda en `[app] modo_real` (true solo en el modo real). La carpeta de prueba se elige por sesión.
    - **Empezar la planilla de cero** (reset, ver abajo).
    - Una fila por ítem o una por factura; escribir el servicio en la columna C.
-- Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. Abajo a la derecha hay un aviso de versión alfa (foto de Simba: "¡ESTO ES UNA ALPHA! Mandar bugs y sugerencias a Matheo"), que se cierra con la X.
+- Al abrir, si hay otra versión de la app escuchando en el puerto, la cierra; solo si la línea de comando del proceso es Python con `appfacturas` (otro programa en el mismo puerto no se toca).
+- Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. En el encabezado, al lado del nombre, un cartel ALPHA con la foto de Simba ("¡Esto es una alpha! Mandá bugs y sugerencias a Matheo" al pasar el mouse).
+- Las tareas largas (rearmar la carpeta de prueba, guardar la memoria, deshacer, exportar, reintentar, Setup, volver del reset) muestran un aviso con ruedita mientras corren, y los botones de acción quedan deshabilitados hasta que terminan.
+- Cambiar de modo de trabajo con un lote leído sin confirmar pide confirmación (se descarta lo editado en la grilla). La pestaña Proveedores se actualiza sola con el modo.
 
 ## Setup (preparar.py)
 
@@ -136,7 +141,8 @@ Estructura de la carpeta de la app:
   - Se lee solo la copia ORIGINAL. Las marcas DUPLICADO y TRIPLICADO se buscan arriba y al pie, también con letras separadas.
 - **Parsers** (`parsers\`, se registran solos):
   - `arca.py` lee por posición: el valor está a la derecha de su etiqueta.
-  - `generico.py` arma líneas por posición. Cubre MDQ, el estilo Santiago SOS y los comprobantes no fiscales, como los de ABC con número "FAC0297".
+  - `generico.py` arma líneas por posición. Cubre facturas fiscales hechas con otros sistemas de facturación ("Comprobante N°:", "Nº: 0001-00000001", "Neto:") y los comprobantes no fiscales, sin CUIT ni CAE, con número propio ("FAC0001").
+- **Nombre de un proveedor nuevo:** si viene todo en mayúsculas se pasa a "Tipo Título", salvo SRL, SA, SAS, las siglas sin vocales ("MG", "STM") y las de `[reglas] siglas` en `config.toml`.
 - **N° de tarea:** 6 cifras entre 300000 y 999999. Se toma solo del detalle de la factura; el nombre del archivo es apenas una pista. No se toma un número precedido por "$" o por precio, importe, total, monto o unitario (salvo que diga tarea, exp. o servicio en el medio).
 - **CUIT del emisor (lector genérico):** entre los CUIT válidos que no son de RUA, se prefiere el que está en una línea con la etiqueta "CUIT" en el tercio de arriba de la página. Si hay más de uno, aviso REVISAR "hay varios CUIT".
 - **Tipos de comprobante:** Factura, Nota de Crédito, Nota de Débito, Recibo (códigos 4, 9, 15 y 54) y Nota de Venta (5 y 10). El tipo va en el nombre del archivo y en la clave de duplicado, así un Recibo no choca con la Factura del mismo número.
@@ -204,8 +210,8 @@ Estructura de la carpeta de la app:
 
 ## Pruebas
 
-- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, Recibo y Nota de Venta, tarea vs precio, CUIT del emisor, No Gravado, ARCA sin período, Factura B, Nota de Débito, IVA 10,5 %, PDF escaneado y con contraseña, original y duplicado en un PDF, zip con subcarpetas, .txt con dos CBU, mismo número contra las carpetas, archivos que no se movieron, memoria y reset que se deshacen, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
-- `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
+- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación, lotes cortados a medias, Recibo y Nota de Venta, tarea vs precio, CUIT del emisor, No Gravado, ARCA sin período, Factura B, Nota de Débito, IVA 10,5 %, PDF escaneado y con contraseña, original y duplicado en un PDF, zip con subcarpetas, .txt con dos CBU, mismo número contra las carpetas, archivos que no se movieron, memoria y reset que se deshacen, edición de Proveedor y Monto, deshacer con A o J cambiadas, reintentar sin la hoja, zip excluido a medias, link de SharePoint con el registro simulado, y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
+- `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, otros sistemas de facturación, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
 - Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Las dos usan openpyxl y tardan segundos. La prueba que abre Excel de verdad (COM) corre solo si se pide: `python -m pytest -q -m excel app\tests_privados` (un minuto y medio).
 - También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).
 

@@ -171,3 +171,11 @@ def sha256(p: Path) -> str:
 
 def ahora_id() -> str:
     return datetime.now().strftime("%Y-%m-%d_%H%M%S")
+
+
+def relativa(p, base) -> str:
+    """`p` relative to `base` for messages ("Vehicular\\Prov\\Factura ..."), or the full path if not inside."""
+    try:
+        return str(Path(p).relative_to(base))
+    except (ValueError, TypeError):
+        return str(p)

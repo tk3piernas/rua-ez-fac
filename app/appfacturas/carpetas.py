@@ -6,7 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from .parsers.base import nombre_afip, tipo_de_codigo
-from .util import sha256
+from .util import relativa, sha256
 
 
 def clave(cuit: str, tipo: str, pv, nro) -> str:
@@ -14,7 +14,7 @@ def clave(cuit: str, tipo: str, pv, nro) -> str:
 
 
 def clave_nf(prov: str, tipo: str, numero: str) -> str:
-    """Key of a non-fiscal receipt ("FAC0297"): provider key + its own number."""
+    """Key of a non-fiscal receipt ("FAC0001"): provider key + its own number."""
     return f"{prov}|{tipo}|{numero.upper()}"
 
 
@@ -87,7 +87,4 @@ class Indice:
         return None
 
     def rel(self, p: Path) -> str:
-        try:
-            return str(p.relative_to(self.base))
-        except ValueError:
-            return str(p)
+        return relativa(p, self.base)

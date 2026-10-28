@@ -76,7 +76,7 @@ def leer(ruta: Path) -> DocPdf:
         for i, page in enumerate(doc):
             texto = page.get_text()
             spans = _spans(page)
-            # the copy mark is printed at the top (ARCA) or at the bottom (MDQ, "D U P L I C A D O")
+            # the copy mark is printed at the top (ARCA) or at the bottom (some billing software, "D U P L I C A D O")
             borde = " ".join(s.texto for s in spans if s.y0 < page.rect.height * 0.12 or s.y0 > page.rect.height * 0.88)
             if i > 0 and _COPIA_RE.search(borde):
                 break

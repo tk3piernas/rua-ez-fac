@@ -41,3 +41,18 @@ def test_norm():
 ])
 def test_parse_fecha(txt, esperado):
     assert parse_fecha(txt) == esperado
+
+
+def test_nombre_prolijo_y_siglas():
+    from appfacturas.proveedores import nombre_prolijo
+    assert nombre_prolijo("GRUAS DEL SUR SRL") == "Gruas Del Sur SRL"
+    assert nombre_prolijo("AUXILIOS MG") == "Auxilios MG"                      # no vowels: a sigla
+    assert nombre_prolijo("ABC SOLUCIONES") == "Abc Soluciones"
+    assert nombre_prolijo("ABC SOLUCIONES", ("abc",)) == "ABC Soluciones"      # [reglas] siglas
+
+
+def test_cerrar_solo_esta_app():
+    from appfacturas.ui import es_esta_app
+    assert es_esta_app(r'"C:\app\.venv\Scripts\pythonw.exe" -m appfacturas ui')
+    assert not es_esta_app(r'"C:\Python\python.exe" -m http.server 8765')
+    assert not es_esta_app("")

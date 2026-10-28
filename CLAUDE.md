@@ -6,7 +6,7 @@ App de escritorio (Python 3.15 + NiceGUI) que carga las facturas de proveedores 
 
 - Matheo (Asesor de Alianzas en RUA). Respondé en español rioplatense, breve. Nunca uses la palabra "envergadura".
 - Tiene un límite de uso ajustado: preferí leer texto y logs antes que capturas, y no releas archivos grandes sin necesidad.
-- Cada vez que cambies algo, decile **dónde quedó**: la ruta completa en Windows de cada archivo nuevo o cambiado (por ejemplo `C:\Users\mkouroussis\Documents\App Facturas\app\appfacturas\ui.py`).
+- Cada vez que cambies algo, decile **dónde quedó**: la ruta completa en Windows de cada archivo nuevo o cambiado (por ejemplo `%USERPROFILE%\Documents\App Facturas\app\appfacturas\ui.py`, con la ruta real escrita).
 
 ## El repo es PÚBLICO: qué nunca se sube
 

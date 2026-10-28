@@ -18,7 +18,7 @@ from .model import Lote
 HIST_MEMORIA = "memoria_proveedores.json"
 
 
-from .util import ruta_libre, sha256, url_sharepoint
+from .util import relativa, ruta_libre, sha256, url_sharepoint
 
 
 class YaDeshecho(Exception):
@@ -108,10 +108,7 @@ class Ejecutor:
             self.diario.anotar({"op": "carpeta_creada", "ruta": str(c)})
 
     def _rel(self, p: Path) -> str:
-        try:
-            return str(p.relative_to(self.cfg.base))
-        except ValueError:
-            return str(p)
+        return relativa(p, self.cfg.base)
 
     def ejecutar(self) -> dict:
         with _uno_por_vez(self.carpeta, YaConfirmado):

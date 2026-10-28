@@ -28,15 +28,23 @@ def clave_sin_cuit(nombre: str) -> str:
     return "SC:" + norm(nombre)
 
 
-_SIGLAS = {"srl", "sa", "sas", "sh", "s.a.", "s.r.l.", "s.a.s.", "ii", "iii", "mg", "mmt", "stm", "sos", "arc", "mdq", "abc"}
+_SIGLAS = {"srl", "sa", "sas", "sh", "s.a.", "s.r.l.", "s.a.s.", "ii", "iii", "sos"}
+_VOCALES = set("aeiouáéíóú")
 
 
-def nombre_prolijo(s: str) -> str:
+def _es_sigla(w: str, siglas=()) -> bool:
+    """Legal forms, the ones in config.toml ([reglas] siglas) and short words without vowels ("MG", "STM")
+    stay in capitals."""
+    x = w.lower()
+    return x in _SIGLAS or x in siglas or (len(x) <= 4 and x.isalpha() and not set(x) & _VOCALES)
+
+
+def nombre_prolijo(s: str, siglas=()) -> str:
     """'AUXILIO REMOLQUES PINAMAR' -> 'Auxilio Remolques Pinamar' (keeps SRL, SA...)."""
     s = re.sub(r"\s+", " ", s or "").strip()
     if not s or not s.isupper():
         return s
-    return " ".join(w.upper() if w.lower() in _SIGLAS else w.capitalize() for w in s.split(" "))
+    return " ".join(w.upper() if _es_sigla(w, siglas) else w.capitalize() for w in s.split(" "))
 
 
 class Registro:

@@ -22,14 +22,9 @@ if exist "%PY%" goto :tengo_venv
 set "BASEPY="
 py -3.15 -c "pass" >nul 2>&1 && set "BASEPY=py -3.15"
 if defined BASEPY goto :crear_venv
+rem Without the "py" launcher there is no Python Install Manager: open the download page.
 where py >nul 2>&1
-if errorlevel 1 goto :espejo
-echo Esta carpeta es solo para subir los archivos a GitHub: no se instala desde aca.
-echo Usa el instalador de la carpeta de la app (Documentos\App Facturas).
-pause
-exit /b 1
-
-:sinpython
+if errorlevel 1 goto :sinpython
 echo       No tengo Python 3.15; lo instalo con el Python Install Manager ...
 py install 3.15
 py -3.15 -c "pass" >nul 2>&1 && set "BASEPY=py -3.15"
@@ -85,6 +80,12 @@ exit /b 0
 
 :fin_con_faltas
 echo La app quedo instalada, pero hay cosas que faltan (FALTA arriba).
+pause
+exit /b 1
+
+:espejo
+echo Esta carpeta es solo para subir los archivos a GitHub: no se instala desde aca.
+echo Usa el instalador de la carpeta de la app (Documentos\App Facturas).
 pause
 exit /b 1
 

@@ -19,6 +19,7 @@ __pycache__/
 # the old PS1 script (retired) and local tools that need real invoices
 /paridad/
 *.ps1
+!/instalar.ps1
 /Probar Excel (prueba).bat
 /Probar mover archivos (prueba).bat
 

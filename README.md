@@ -28,6 +28,21 @@ Si editás el nombre de un proveedor nuevo en la grilla, se cambia en todo (carp
 
 ## Instalar
 
+### Lo más fácil: una sola línea
+
+1. Abrí **PowerShell**: menú Inicio → escribí `PowerShell` → Enter.
+2. Pegá esta línea y apretá Enter:
+
+   ```powershell
+   irm https://raw.githubusercontent.com/tk3piernas/rua-ez-fac/main/instalar.ps1 | iex
+   ```
+
+3. Esperá. La primera vez tarda unos minutos.
+
+Baja la última versión, la guarda en **Documentos\RUA EZ-Fac** (nunca adentro de OneDrive), le saca la marca de "bajado de internet" y corre el instalador. Si falta Python 3.15 lo instala solo, o te abre la página para bajarlo. Al final queda el ícono **RUA EZ-Fac** en el Escritorio. **Para actualizar se usa la misma línea**: conserva tu configuración y tus datos.
+
+### Si preferís el zip
+
 1. En esta página: **Code → Download ZIP**.
 2. Descomprimilo en **Documentos**, por ejemplo `C:\Users\<usuario>\Documents\RUA EZ-Fac`. **Nunca adentro de OneDrive**: el OneDrive de RUA no deja guardar programas.
 3. Si Windows marca los archivos como bajados de internet, hacé clic derecho en el zip **antes de descomprimir** → Propiedades → tildá **Desbloquear** → Aceptar.
@@ -66,14 +81,15 @@ Arriba, al lado del nombre de la app: si hay facturas esperando aparece **N para
 
 ## Actualizar
 
-- Bajá el ZIP nuevo.
-- Copiá su contenido encima de tu carpeta. Se conservan `config.toml`, `datos\` y `.venv\`.
+- Lo más fácil: la misma línea de PowerShell de **Instalar**.
+- O bajá el ZIP nuevo y copiá su contenido encima de tu carpeta. Se conservan `config.toml`, `datos\` y `.venv\`.
 - Abrí el ícono. Si había una versión abierta, se cierra sola.
 - Solo si cambió algún `requirements*.txt`, corré de nuevo el instalador.
 
 ## Qué hay en el repo
 
 ```
+instalar.ps1                           instala o actualiza desde GitHub con una línea de PowerShell
 Instalar o actualizar RUA EZ-Fac.bat   instala / actualiza / crea los íconos / revisa la PC
 Abrir RUA EZ-Fac (con consola).bat     abre la app mostrando lo que pasa (para diagnosticar)
 Armar instalador para otra PC.bat      arma un zip de la instalación actual para pasarlo

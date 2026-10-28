@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.15.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.16.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -47,16 +47,22 @@ Estructura de la carpeta de la app:
   - Windows con Excel de escritorio.
   - OneDrive de RUA sincronizado con "Facturas pendientes".
   - Python 3.15. El instalador lo baja con el Python Install Manager (`py install 3.15`) si hace falta.
+- **Instalar o actualizar con una línea** (`instalar.ps1`, en la raíz del repo): en PowerShell, `irm https://raw.githubusercontent.com/tk3piernas/rua-ez-fac/main/instalar.ps1 | iex`.
+  - Elige la carpeta: `Documentos\RUA EZ-Fac`; si ya existe `Documentos\App Facturas` con el instalador, usa esa; si Documentos está adentro de OneDrive, `%LOCALAPPDATA%\RUA EZ-Fac`. Nunca instala en OneDrive ni encima de una copia de Git.
+  - Baja `main.zip` de GitHub, lo descomprime en una carpeta temporal y lo copia con `robocopy /E`: actualiza lo que cambió y no toca `config.toml`, `datos\` ni `.venv\` (no vienen en el zip). Le saca la marca de "bajado de internet" (`Unblock-File`) y corre el `.bat`.
+  - Como se ejecuta con `iex` y no como archivo `.ps1`, no lo frena la política de ejecución de scripts.
+  - Para probarlo sin tocar nada real: `RUA_EZFAC_DESTINO` (otra carpeta), `RUA_EZFAC_ZIP` (un zip local) y `RUA_EZFAC_SIN_INSTALAR=1`.
 - **Qué hace `Instalar o actualizar RUA EZ-Fac.bat`:**
   1. Frena si la carpeta está dentro de OneDrive.
-  2. Crea `.venv`.
-  3. Instala las librerías:
+  2. Busca Python 3.15. Si está el lanzador `py` (Python Install Manager), lo instala con `py install 3.15`; si no, abre la página de descarga. Si no lo consigue, avisa y termina (antes, sin `py` se cortaba y con `py` pero sin 3.15 no instalaba nada).
+  3. Crea `.venv`.
+  4. Instala las librerías:
      - `requirements.txt` y `requirements-ui.txt`;
      - después, `requirements-nodeps.txt` con `--no-deps`. PyMuPDF 2.0 pide onnxruntime y NiceGUI pide uvicorn[standard], que trae pyyaml; ninguno de los dos tiene versión para Python 3.15 y la app no los usa.
      - Sin internet, usa la carpeta `wheels\` si existe.
-  4. Escribe `appfacturas.pth` en el venv.
-  5. Crea los íconos "RUA EZ-Fac" en el Escritorio y en el menú Inicio (`pythonw -m appfacturas ui`, ícono `static\ezfac.ico`) y borra los viejos "App Facturas".
-  6. Corre las pruebas, si están, y `appfacturas verificar` (resultado en `datos\verificacion.txt`).
+  5. Escribe `appfacturas.pth` en el venv.
+  6. Crea los íconos "RUA EZ-Fac" en el Escritorio y en el menú Inicio (`pythonw -m appfacturas ui`, ícono `static\ezfac.ico`) y borra los viejos "App Facturas".
+  7. Corre las pruebas, si están, y `appfacturas verificar` (resultado en `datos\verificacion.txt`).
 - **Actualizar:** se copian los `.py` nuevos en `app\appfacturas\` y se abre la app. Si estaba abierta una versión anterior, la app la cierra sola: consulta `/api/version` y, si no coincide, hace `taskkill` del python que escucha en el puerto. Solo hace falta reinstalar cuando cambian los `requirements`.
 - **Instalar en otra PC:**
   1. En la PC que ya tiene la app, correr `Armar instalador para otra PC.bat`. El zip no lleva pruebas, datos, configuración ni facturas.

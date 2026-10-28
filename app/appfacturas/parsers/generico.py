@@ -114,7 +114,9 @@ class Generico(Parser):
         # --- dates
         e.emision = parse_fecha(_buscar(r"(?i)Fecha(?:\s+de\s+Emisi[oó]n)?\s*:\s*([^\n]{6,22})", texto))
         e.desde = parse_fecha(_buscar(r"(?i)Desde\s*:?\s*([\d/.-]{8,10})", texto))
-        vto = _buscar(r"(?i)(?:venc(?:imiento|\.)?\s+(?:de\s+)?pago|vto\.?\s+(?:para\s+el\s+)?pago|vencimiento)\s*:?\s*([^\n]{6,22})", texto)
+        # never the CAE's due date ("Fecha de Vencimiento CAE"): it is ~10 days after the issue date
+        sin_cae = "\n".join(l for l in texto.splitlines() if not re.search(r"(?i)\bC\.?A\.?E\b", l))
+        vto = _buscar(r"(?i)(?:venc(?:imiento|\.)?\s+(?:de\s+)?pago|vto\.?\s+(?:para\s+el\s+)?pago|vencimiento)\s*:?\s*([^\n]{6,22})", sin_cae)
         e.vto = parse_fecha(vto)
 
         # --- totals (amount = rightmost amount on the label's line)

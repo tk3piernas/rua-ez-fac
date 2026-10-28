@@ -10,7 +10,7 @@ RUA EZ-Fac lee los PDF, zip y .txt que mandan los proveedores. Detecta duplicado
 - da de alta los proveedores nuevos;
 - escribe las filas en la planilla, esté abierta o cerrada.
 
-Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
+Las facturas que se frenan (en rojo en la grilla, por ejemplo una Factura A sin neto) se ven pero no se cargan, y el resto del lote sigue. Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
 
 - **Guía de uso (2 páginas):** [docs/Guia de uso RUA EZ-Fac.pdf](docs/Guia%20de%20uso%20RUA%20EZ-Fac.pdf)
 - **Documentación técnica:** [docs/DOCUMENTACION.md](docs/DOCUMENTACION.md)
@@ -42,7 +42,7 @@ Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
 
 Pestaña **Proveedores**: pegá los datos como vengan (mail, WhatsApp, .txt) y tocá *Leer los datos*. La app saca CUIT, CBU/CVU, alias, banco y contacto, chequea el CUIT y el CBU y te muestra la ficha para corregir antes de guardar. Se guardan en `PROVEEDORES RUA.xlsx` (OneDrive, al lado de la planilla), que no se toca con las actualizaciones. Cuando un lote trae un proveedor que no está en la hoja Proveedores de la planilla, la app copia sus datos desde ahí; y los datos que llegan en .txt con un lote se guardan solos. Cada cambio se puede deshacer.
 
-La primera vez la app arranca con la **escritura real apagada**: sobre tus carpetas y tu planilla solo lee y simula. Para practicar, usá Configuración → *Trabajar sobre la carpeta de prueba*. Cuando estés seguro, prendé *Habilitar escritura real*.
+La primera vez la app arranca con la **escritura real apagada**: sobre tus carpetas y tu planilla solo lee y simula. Para practicar, usá Configuración → *Trabajar sobre la carpeta de prueba*. En la carpeta de prueba la app nunca escribe en la planilla real, aunque la tengas abierta en Excel. Cuando estés seguro, prendé *Habilitar escritura real*.
 
 ## Abrir y exportar la planilla
 

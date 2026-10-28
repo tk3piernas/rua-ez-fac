@@ -88,9 +88,32 @@ class Estado_:
     trabajo: Path | None = None
     resultado: dict | None = None
     log: list[str] = []
+    ocupado: bool = False                 # a confirm, undo or retry is running: those buttons wait
 
 
 S = Estado_()
+
+
+def de_a_uno(fn):
+    """Confirm / undo / retry never run twice at the same time (a double click duplicated rows)."""
+    import functools
+
+    @functools.wraps(fn)
+    async def envuelta(*a, **kw):
+        if S.ocupado:
+            ui.notify("Esperá: todavía estoy terminando lo anterior.", type="info")
+            return
+        S.ocupado = True
+        try:
+            return await fn(*a, **kw)
+        finally:
+            S.ocupado = False
+    return envuelta
+
+
+def mientras_libre(boton):
+    """Button disabled while something is running."""
+    return boton.bind_enabled_from(S, "ocupado", backward=lambda o: not o)
 
 
 # ------------------------------------------------------------------ paths
@@ -176,7 +199,8 @@ def filas_grid(lote) -> list[dict]:
 
 
 COLUMNAS = [
-    {"field": "incluir", "headerName": "Cargar", "width": 85, "editable": True, "cellDataType": "boolean"},
+    {"field": "incluir", "headerName": "Cargar", "width": 85, ":editable": "params => !params.data.bloquea",
+     "cellDataType": "boolean"},
     {"field": "area", "headerName": "Área", "width": 95},
     {"field": "proveedor", "headerName": "Proveedor", "editable": True, "minWidth": 170, "flex": 1},
     {"field": "factura", "headerName": "Factura", "width": 190},
@@ -202,6 +226,9 @@ def aplicar_edicion(lote, args: dict) -> str | None:
         return None
     r = lote.filas[i]
     v = data.get(col)
+    if r.bloqueada:
+        r.excluida = True
+        return "Esta factura tiene un aviso que la frena (en rojo): no se carga"
     if col == "incluir":
         r.excluida = not bool(v)
         return None
@@ -463,7 +490,9 @@ def panel_revision(tabs=None, t_res=None):
         with seccion("Confirmar", "check_circle", "w-[760px]"):
             with ui.row().classes("justify-center items-center gap-4"):
                 btn = ui.button("Confirmar y cargar", icon="check", on_click=lambda: confirmar(tabs, t_res)).props("size=lg color=positive unelevated").classes("px-6")
-                if not puede_escribir(cfg):
+                if puede_escribir(cfg):
+                    mientras_libre(btn)
+                else:
                     btn.disable()
                     btn.tooltip("La escritura en la planilla real todavía no está habilitada (Configuración)")
                 ui.button("Copiar filas al portapapeles", icon="content_copy", on_click=copiar).props("outline")
@@ -487,6 +516,7 @@ async def copiar():
         ui.notify(f"No pude copiar: {ex}", type="negative")
 
 
+@de_a_uno
 async def confirmar(tabs, t_res):
     lote, cfg = S.lote, S.cfg
     excluidas = aplicar_exclusiones(lote)
@@ -506,6 +536,9 @@ async def confirmar(tabs, t_res):
     n = ui.notification("Cargando…", spinner=True, timeout=None)
     try:
         S.resultado = await run.io_bound(lambda: ejecutor.Ejecutor(cfg, lote, S.trabajo, log=lambda s: None).ejecutar())
+    except ejecutor.YaConfirmado as ex:
+        ui.notify(f"No hice nada: {ex}.", type="info")
+        return
     finally:
         n.dismiss()
     if S.resultado["excel"] == "pendiente" and "cambios sin guardar" in S.resultado["excel_mensaje"]:
@@ -554,17 +587,20 @@ def panel_resultado():
         with seccion("Acciones", "build", "w-[760px]"):
             with ui.row().classes("justify-center gap-4"):
                 if est.get("excel") == "pendiente":
+                    @de_a_uno
                     async def reintentar():
                         e2, msg = await run.io_bound(ejecutor.reintentar_excel, S.cfg, S.trabajo, False, lambda s: None)
                         S.resultado["excel"], S.resultado["excel_mensaje"] = e2, msg
                         ui.notify("Filas escritas" if e2 == "escrito" else f"Siguen pendientes: {msg}",
                                   type="positive" if e2 == "escrito" else "warning")
                         panel_resultado.refresh()
-                    ui.button("Reintentar planilla", icon="refresh", on_click=reintentar)
+                    mientras_libre(ui.button("Reintentar planilla", icon="refresh", on_click=reintentar))
                     ui.button("Copiar filas al portapapeles", icon="content_copy", on_click=copiar).props("outline")
-                ui.button("Deshacer este lote", icon="undo", on_click=lambda: deshacer(S.trabajo)).props("color=negative outline")
+                mientras_libre(ui.button("Deshacer este lote", icon="undo", on_click=lambda: deshacer(S.trabajo))
+                               .props("color=negative outline"))
 
 
+@de_a_uno
 async def deshacer(trabajo: Path):
     with ui.dialog() as dlg, ui.card().classes("items-center"):
         ui.label(f"¿Deshago el lote {trabajo.name}?").classes("font-bold")
@@ -619,8 +655,8 @@ def panel_historial():
                                   {"field": "errores", "headerName": "Errores", "width": 100}],
                    "autoSizeStrategy": {"type": "fitGridWidth"}, "rowData": filas}, theme="balham").classes("w-full").style(f"height: {min(600, 64 + 28 * len(filas))}px")
         if ultimo:
-            ui.button(f"Deshacer el último lote confirmado ({ultimo.name})", icon="undo",
-                      on_click=lambda: deshacer(ultimo)).props("color=negative outline")
+            mientras_libre(ui.button(f"Deshacer el último lote confirmado ({ultimo.name})", icon="undo",
+                                     on_click=lambda: deshacer(ultimo)).props("color=negative outline"))
 
 
 # ------------------------------------------------------------------ open / export the workbook

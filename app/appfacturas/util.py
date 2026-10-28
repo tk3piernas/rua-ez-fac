@@ -64,11 +64,14 @@ _MESES = {m: i + 1 for i, ms in enumerate([
 
 
 def parse_fecha(s: str | None) -> date | None:
-    """dd/mm/yyyy (also - or .), "jun 13, 2026", "13 de junio de 2026"."""
+    """dd/mm/yyyy (also - or .), yyyy-mm-dd, "jun 13, 2026", "13 de junio de 2026"."""
     if not s:
         return None
-    m = re.search(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?!\d)", s)
     try:
+        m = re.search(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)", s)                         # ISO 2026-10-22
+        if m:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        m = re.search(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?!\d)", s)
         if m:
             y = int(m.group(3))
             return date(y + 2000 if y < 100 else y, int(m.group(2)), int(m.group(1)))

@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 import shutil
+import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -16,9 +18,33 @@ from .model import Lote
 HIST_MEMORIA = "memoria_proveedores.json"
 
 
+from .util import ruta_libre, sha256, url_sharepoint
+
+
 class YaDeshecho(Exception):
     """Undo asked twice for the same batch: nothing is touched."""
-from .util import ruta_libre, sha256, url_sharepoint
+
+
+class YaConfirmado(Exception):
+    """Confirm asked twice for the same batch (double click): nothing is done the second time."""
+
+
+_ocupados: set[str] = set()              # batch folders with a confirm or undo running in this process
+_candado = threading.Lock()
+
+
+@contextmanager
+def _uno_por_vez(carpeta: Path, error):
+    clave = str(carpeta.resolve()).lower()
+    with _candado:
+        if clave in _ocupados:
+            raise error(f"el lote {carpeta.name} ya se está procesando")
+        _ocupados.add(clave)
+    try:
+        yield
+    finally:
+        with _candado:
+            _ocupados.discard(clave)
 
 ORDEN = {"proveedor_nuevo": 0, "mover": 1, "copiar": 1, "mover_zip": 2, "a_duplicados": 3, "txt_procesado": 4}
 
@@ -87,6 +113,13 @@ class Ejecutor:
             return str(p)
 
     def ejecutar(self) -> dict:
+        with _uno_por_vez(self.carpeta, YaConfirmado):
+            ya = estado(self.carpeta).get("estado", "")
+            if ya:
+                raise YaConfirmado(f"el lote {self.carpeta.name} ya está {ya}; no lo vuelvo a confirmar")
+            return self._ejecutar()
+
+    def _ejecutar(self) -> dict:
         _guardar_estado(self.carpeta, estado="en curso", inicio=datetime.now().isoformat(timespec="seconds"))
         pasos = sorted((p for p in self.lote.plan if p["op"] in ORDEN), key=lambda p: ORDEN[p["op"]])
         for p in pasos:
@@ -252,9 +285,14 @@ def deshacer(carpeta_lote: Path, log=print, cfg=None) -> list[str]:
     """Walks the journal backwards: first the Excel rows, then the files.
     Returns the problems (things that changed after the batch). If the workbook can't be
     opened, nothing is undone (so rows never point to files that moved back)."""
+    with _uno_por_vez(carpeta_lote, YaDeshecho):
+        if estado(carpeta_lote).get("estado") == "deshecho":
+            raise YaDeshecho(f"el lote {carpeta_lote.name} ya estaba deshecho")
+        return _deshacer(carpeta_lote, log, cfg)
+
+
+def _deshacer(carpeta_lote: Path, log, cfg) -> list[str]:
     from . import excel
-    if estado(carpeta_lote).get("estado") == "deshecho":
-        raise YaDeshecho(f"el lote {carpeta_lote.name} ya estaba deshecho")
     pasos = Diario(carpeta_lote).pasos
     problemas: list[str] = []
     if excel.pasos_guardados(pasos):

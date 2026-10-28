@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.9.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.9.1 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -138,15 +138,19 @@ Estructura de la carpeta de la app:
   - Factura fiscal: `CUIT|tipo|PV|nro`.
   - No fiscal: `SC:<nombre normalizado>|tipo|FAC…`.
   - Mismo número con otro importe: se frena (BLOQUEA) y queda en `_Entrada`.
+- **Avisos BLOQUEA:** la factura se ve en la grilla en rojo, con "Cargar" destildado y sin poder tildarlo. No se mueve ni genera filas, así que el resto del lote se carga igual (por ejemplo, si a la planilla le falta la hoja de un área).
 - **Columna H (IVA):**
   - Factura B, Factura C y no fiscal: 0.
   - Factura A: se escribe el IVA real solo si difiere de la fórmula en más de `tolerancia_iva` ($1).
+  - Factura A sin IVA (el total es igual al neto, por ejemplo un servicio exento): 0, con aviso REVISAR.
+  - Factura A sin neto leído: BLOQUEA ("no leí el neto gravado; no la cargo"). Se carga a mano.
   - Si no, queda la fórmula.
   - La columna I nunca se toca.
 - **Factura A:** en G va el neto, no el total. El script viejo cargaba el total y contaba el IVA dos veces.
 - **Fechas:**
   - E: fecha del servicio ("Desde"); si no hay, la emisión.
-  - F: vencimiento; si no hay, la emisión, con aviso.
+  - F: vencimiento; si no hay, la emisión, con aviso. Nunca el vencimiento del CAE.
+  - Se leen dd/mm/aaaa (también con - o .), aaaa-mm-dd y fechas con el mes en letras.
 - **CUIT, teléfono, número de cuenta y CBU:** siempre como texto.
 - **.txt de proveedores:**
   - Varias cuentas: la primera va a la fila y las demás a Observaciones.
@@ -155,13 +159,19 @@ Estructura de la carpeta de la app:
 
 ## Escritura en Excel (excel.py)
 
-- **Si la planilla está abierta:** la busca en la Running Object Table, por ruta o por su URL de SharePoint, y escribe en esa misma ventana.
+- **Si la planilla está abierta:** la busca en la Running Object Table y escribe en esa misma ventana. Solo toma el libro cuya ruta local es exactamente la de la planilla, o cuya URL de SharePoint completa es la de la planilla real de `config.toml` (también lo verifica con `FullName`). En la carpeta de prueba no se usa ninguna URL, así que nunca escribe en la planilla real aunque esté abierta, ni en una exportada con el mismo nombre.
+- **Si algo falla a mitad con la planilla abierta:** revierte las celdas y deja el libro como guardado, para que el reintento no pida guardar cambios que no hizo nadie.
 - **Si está cerrada:** abre un Excel oculto, guarda y cierra.
 - **Fila libre:** la primera fila entre la 12 y la 210 con A–G y J vacías.
 - **Columna J:** `=HYPERLINK("url","Factura 0002-00000189")`.
 - **Posible duplicado:** A:J en amarillo (color 13431551) y un comentario en A.
 - **Si la planilla tiene cambios sin guardar:** no escribe y las filas quedan pendientes. Se pueden reintentar o copiar al portapapeles.
 - **Antes de escribir:** hace un respaldo en `datos\backups\`. Cada paso se anota en el diario antes de escribir; si algo falla a mitad, revierte y no guarda.
+
+## Confirmar y deshacer, de a uno
+
+- Mientras corre una confirmación, un deshacer o un reintento, esos botones quedan deshabilitados.
+- `Ejecutor.ejecutar` no confirma un lote que ya tiene estado (en curso, confirmado o deshecho), y ni confirmar ni deshacer corren dos veces a la vez sobre el mismo lote. Antes, un doble clic duplicaba las filas.
 
 ## Deshacer (ejecutor.py)
 
@@ -177,9 +187,9 @@ Estructura de la carpeta de la app:
 
 ## Pruebas
 
-- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla.
+- `app\tests` (en el repo): pruebas que no necesitan facturas reales: montos, fechas, CUIT/CBU (con números inventados), links, empaquetado, Setup y reset de la planilla, búsqueda del libro abierto, doble confirmación y facturas sintéticas (Factura A sin neto o exenta, hoja faltante, vencimiento del CAE). `test_repo_sin_datos.py` falla si algún archivo del repo tiene un CBU o un CUIT válido que no sea el de RUA ni uno de los inventados.
 - `app\tests_privados` (solo en la PC de desarrollo, en `.gitignore`): pruebas con facturas reales como fixtures (`app\tests_privados\fixtures\`, tienen CUIT y CBU de proveedores). Cubren ARCA A/C/NC, MDQ, no fiscales, duplicados, columna H, .txt, mover + deshacer, Excel y exclusiones.
-- Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Entre las dos son 50.
+- Se corren por separado (cada carpeta tiene su `conftest.py`): `python -m pytest -q app\tests` y `python -m pytest -q app\tests_privados`. Las dos usan openpyxl y tardan segundos. La prueba que abre Excel de verdad (COM) corre solo si se pide: `python -m pytest -q -m excel app\tests_privados` (un minuto y medio).
 - También solo en esa PC: `Probar mover archivos (prueba).bat`, `Probar Excel (prueba).bat` (Excel real, planilla cerrada y abierta; deshacer la dejó idéntica celda por celda) y `Prueba de paridad.bat` contra el script viejo (0 diferencias sin explicar).
 
 ## Desarrollo con Claude Code y Git

@@ -35,5 +35,12 @@ __pycache__/
 ~$*
 
 # Claude Code local settings
-.claude/settings.local.json
-/.claude/launch.json
+.claude/
+
+# safety nets: workbooks, logs, invoices and provider files never go up
+*.xlsx
+*.log
+/*.csv
+/*.pdf
+app/**/*.pdf
+app/**/*.txt

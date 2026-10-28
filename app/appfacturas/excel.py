@@ -14,7 +14,7 @@ import shutil
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 PRIMERA, ULTIMA = 12, 210
 COLS = "ABCDEFGHIJ"
@@ -68,6 +68,9 @@ class LibroOpenpyxl:
 
     def guardar(self):
         self.wb.save(self.ruta)
+
+    def marcar_guardado(self):
+        self.saved = True
 
     def guardar_copia(self, destino: Path):
         shutil.copy2(self.ruta, destino)
@@ -158,6 +161,7 @@ class LibroCOM:
         self.ruta = ruta
         self.xl = None
         self.nuevo = False
+        self._hojas: list = []
         self.wb = self._buscar_abierto(ruta, url_onedrive)
         self.ya_abierto = self.wb is not None
         if not self.wb:
@@ -176,10 +180,9 @@ class LibroCOM:
 
     @staticmethod
     def _buscar_abierto(ruta: Path, url_onedrive: str):
+        """The workbook in the Running Object Table whose name is exactly `ruta` or `url_onedrive`."""
         import pythoncom
         import win32com.client
-        destino = str(ruta).lower()
-        nombre_url = quote(ruta.name).lower()
         rot = pythoncom.GetRunningObjectTable()
         ctx = pythoncom.CreateBindCtx(0)
         for m in rot:
@@ -187,14 +190,15 @@ class LibroCOM:
                 nombre = m.GetDisplayName(ctx, None)
             except Exception:
                 continue
-            n = nombre.lower()
-            es = n == destino
-            # a OneDrive workbook opened in Excel is registered with its SharePoint URL
-            if not es and url_onedrive and n.startswith("http") and n.endswith("/" + nombre_url):
-                es = True
-            if es:
+            if not es_el_libro(nombre, ruta, url_onedrive):
+                continue
+            try:
                 obj = rot.GetObject(m)
-                return win32com.client.Dispatch(obj.QueryInterface(pythoncom.IID_IDispatch))
+                wb = win32com.client.Dispatch(obj.QueryInterface(pythoncom.IID_IDispatch))
+                if es_el_libro(str(wb.FullName), ruta, url_onedrive):
+                    return wb
+            except Exception:
+                continue
         return None
 
     @property
@@ -203,9 +207,11 @@ class LibroCOM:
 
     def hoja(self, nombre):
         try:
-            return HojaCOM(self.wb.Worksheets(nombre))
+            h = HojaCOM(self.wb.Worksheets(nombre))
         except Exception as e:
             raise ExcelError(f"la planilla no tiene la hoja {nombre}") from e
+        self._hojas.append(h)
+        return h
 
     def nombres(self) -> list[str]:
         return [self.wb.Worksheets(i).Name for i in range(1, self.wb.Worksheets.Count + 1)]
@@ -216,19 +222,30 @@ class LibroCOM:
         m.Copy(None, m)                       # Copy(Before, After)
         ws = self.wb.Worksheets(m.Index + 1)
         ws.Name = nombre
-        return HojaCOM(ws)
+        h = HojaCOM(ws)
+        self._hojas.append(h)
+        return h
 
     def guardar(self):
         self.wb.Save()
+
+    def marcar_guardado(self):
+        """After a revert the cells are as they were on disk: tell Excel there is nothing to save."""
+        self.wb.Saved = True
 
     def guardar_copia(self, destino: Path):
         """Copy with what Excel has now (also unsaved changes); the open workbook stays as it is."""
         self.wb.SaveCopyAs(str(destino))
 
     def cerrar(self):
+        import gc
         try:
+            for h in getattr(self, "_hojas", []):
+                h.ws = None                   # COM sheet objects released before Excel quits
             if self.wb is not None and not self.ya_abierto:
                 self.wb.Close(False)
+            self.wb = None                    # released while Excel is still running
+            gc.collect()
             if self.xl is not None and self.nuevo:
                 self.xl.Quit()
         except Exception:
@@ -321,8 +338,43 @@ def abrir(cfg, ruta: Path | None = None):
         import win32com.client  # noqa: F401
     except ImportError as e:
         raise ExcelError("falta pywin32: corré 'Instalar o actualizar RUA EZ-Fac.bat'") from e
-    real = bool(cfg.base) and "onedrive" in str(ruta).lower()
-    return LibroCOM(ruta, url_onedrive=cfg.url_base if real else "")
+    return LibroCOM(ruta, url_onedrive=url_onedrive_de(cfg, ruta))
+
+
+def _misma_ruta(a, b) -> bool:
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except (OSError, ValueError):
+        return str(a).lower() == str(b).lower()
+
+
+def es_el_libro(nombre: str, ruta: Path, url: str) -> bool:
+    """`nombre` (a ROT display name or a workbook FullName) is this very workbook: same local path,
+    or the full SharePoint URL of the real sheet. A workbook with the same file name elsewhere is not."""
+    n = str(nombre or "")
+    if n.lower().startswith("http"):
+        # the ROT has it percent-encoded, FullName usually not: compare both decoded
+        return bool(url) and unquote(n).rstrip("/").lower() == unquote(url).rstrip("/").lower()
+    return _misma_ruta(n, ruta) if n else False
+
+
+def url_onedrive_de(cfg, ruta: Path) -> str:
+    """Full SharePoint URL of `ruta` only when it is inside the real synced OneDrive folder of
+    config.toml (the real sheet, PROVEEDORES RUA.xlsx...); "" for the test copy or anything else,
+    so an open workbook is then matched only by its local path."""
+    from . import config
+    try:
+        real = config.cargar(cfg.archivo) if getattr(cfg, "archivo", None) else config.cargar()
+    except Exception:
+        return ""
+    if not real.base or not real.url_base:
+        return ""
+    try:
+        rel = Path(ruta).resolve().relative_to(Path(real.base).resolve().parent)
+    except (OSError, ValueError):
+        return ""
+    raiz = real.url_base.rstrip("/").rsplit("/", 1)[0]       # url_base is 'Facturas pendientes'
+    return raiz + "/" + "/".join(quote(p) for p in rel.parts)
 
 
 # ======================================================================= writing
@@ -378,6 +430,12 @@ def escribir(cfg, lote, diario, backups: Path, guardar_cambios_usuario: bool = F
         except Exception:
             # nothing half-written stays in the workbook: undo this run in memory and do not save
             _revertir(libro, hechos)
+            if libro.ya_abierto:
+                # it was saved when we started (checked above), and the revert left it as on disk
+                try:
+                    libro.marcar_guardado()
+                except Exception:
+                    pass
             anotar({"op": "excel_revertido"})
             raise
         libro.guardar()

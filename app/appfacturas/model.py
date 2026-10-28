@@ -138,6 +138,7 @@ class Fila:
     comentario: str = ""
     excluida: bool = False
     editada: bool = False
+    bloqueada: bool = False           # its invoice has a BLOQUEA warning: never loaded, cannot be ticked
 
 
 @dataclass

@@ -226,10 +226,15 @@ class Armador:
     def _importes(self, f: Factura, e) -> None:
         if e.letra in ("A", "M") and e.neto is not None:
             f.monto = e.neto
-            iva = e.iva or Decimal(0)
-            if iva == 0 and e.total is not None and e.total > e.neto:
-                iva = (e.total - e.neto).quantize(CENT)
-            f.iva = iva if iva != 0 else None
+            resto = (e.total - e.neto - (e.otros_tributos or 0)).quantize(CENT) if e.total is not None else None
+            if e.iva:
+                f.iva = e.iva
+            elif resto is not None and resto > 0:
+                f.iva = resto                    # IVA not read (or read as 0) but the total says there is some
+            elif resto is not None and resto == 0:
+                f.iva = Decimal(0)               # total = neto: no IVA (exempt); H must be 0, not the formula
+            else:
+                f.iva = None                     # nothing to check against: the sheet formula stays
         elif e.total is not None:
             f.monto = e.total
             f.iva = Decimal(0) if e.letra in ("B", "C") or not e.fiscal else None
@@ -240,7 +245,13 @@ class Armador:
     # ------------------------------------------------------------ checks
     def _validar(self, f: Factura, e) -> None:
         av = lambda nivel, cod, txt: self.lote.aviso(nivel, cod, f"{f.texto_link} ({f.proveedor}): {txt}", f.id)
-        if e.letra == "A" or e.letra == "M":
+        if e.letra in ("A", "M") and e.neto is None:
+            # G would get the total and H the formula on top of it: paid 21 % more. Not loaded.
+            av(Nivel.BLOQUEA, "a_sin_neto", f"es Factura {e.letra} pero no leí el neto gravado; no la cargo "
+                                            "(cargala a mano en la planilla)")
+        elif e.letra in ("A", "M") and f.iva == 0:
+            av(Nivel.REVISAR, "factura_a_sin_iva", f"es Factura {e.letra} sin IVA (el total es igual al neto): H va en 0")
+        elif e.letra == "A" or e.letra == "M":
             av(Nivel.REVISAR, "factura_a", f"es Factura {e.letra}: lleva IVA ({fmt_monto(f.iva)})")
         elif e.letra == "B":
             av(Nivel.REVISAR, "factura_b", "es Factura B: el monto ya incluye el IVA, H va en 0")
@@ -515,11 +526,17 @@ class Armador:
                 for i in e.items:
                     monto = (i.monto * signo) if i.monto is not None else None
                     iva = (i.iva * signo) if i.iva is not None else None
-                    if e.letra in ("A", "M") and iva is None and f.iva is not None and e.neto:
+                    if e.letra in ("A", "M") and iva is None and f.iva is not None and e.neto and i.monto is not None:
                         iva = (f.iva * (i.monto / e.neto)).quantize(CENT, ROUND_HALF_UP)
                     self.lote.filas.append(Fila(tarea=" / ".join(i.tareas), servicio=_servicio_limpio(i.descripcion),
                                                 monto=monto, iva=_iva_h(e.letra, monto, iva, alic, cfg.tolerancia_iva),
                                                 **base))
+        # an invoice with a blocking warning is shown in the grid but never loaded (one missing sheet
+        # used to make the whole batch fail when writing)
+        bloqueadas = {a.ref for a in self.lote.avisos if a.nivel == Nivel.BLOQUEA and a.ref}
+        for r in self.lote.filas:
+            if r.factura_id in bloqueadas:
+                r.excluida = r.bloqueada = True
 
     # ------------------------------------------------------------ plan (what a real run would do)
     def _plan(self) -> None:

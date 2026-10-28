@@ -1,8 +1,9 @@
+from datetime import date
 from decimal import Decimal as D
 
 import pytest
 
-from appfacturas.util import cbu_valido, cuit_valido, norm, parse_monto, url_sharepoint
+from appfacturas.util import cbu_valido, cuit_valido, norm, parse_fecha, parse_monto, url_sharepoint
 
 
 @pytest.mark.parametrize("txt,esperado", [
@@ -26,9 +27,17 @@ def test_cbu():
 
 
 def test_url_como_el_ps1():
-    u = url_sharepoint("https://x/Documents/Facturas pendientes", "Hogar", "Sebastián Cabral", "Factura 0001-00000461.pdf")
-    assert u == "https://x/Documents/Facturas%20pendientes/Hogar/Sebasti%C3%A1n%20Cabral/Factura%200001-00000461.pdf"
+    u = url_sharepoint("https://x/Documents/Facturas pendientes", "Hogar", "Martín Ñandú", "Factura 0001-00000461.pdf")
+    assert u == "https://x/Documents/Facturas%20pendientes/Hogar/Mart%C3%ADn%20%C3%91and%C3%BA/Factura%200001-00000461.pdf"
 
 
 def test_norm():
     assert norm("Roldán  Juan-Ramón") == "roldan juan ramon"
+
+
+@pytest.mark.parametrize("txt,esperado", [
+    ("22/10/2026", date(2026, 10, 22)), ("22-10-26", date(2026, 10, 22)), ("2026-10-22", date(2026, 10, 22)),
+    ("Fecha: 2026-01-05 10:30", date(2026, 1, 5)), ("13 de junio de 2026", date(2026, 6, 13)), ("", None),
+])
+def test_parse_fecha(txt, esperado):
+    assert parse_fecha(txt) == esperado

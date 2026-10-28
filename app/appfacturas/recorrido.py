@@ -38,7 +38,7 @@ PASOS = [
      "texto": "Lee todo y arma el lote para revisar. <b>Leer no mueve ni escribe nada.</b>"},
     {"tab": "tab-revision", "sel": "avisos", "titulo": "2. Revisión: los avisos",
      "texto": "Lo que conviene mirar antes de cargar: <b>frenan</b> (no se cargan), <b>para revisar</b> y "
-              "<b>para tener en cuenta</b>.",
+              "<b>para tener en cuenta</b>. <i>Lo que ves ahora es un lote de ejemplo: no se carga nada.</i>",
      "falta": "Aparecen después de leer un lote."},
     {"tab": "tab-revision", "sel": "grilla", "titulo": "Las filas que se cargan",
      "texto": "Doble clic para corregir proveedor, fechas, N° de tarea, servicio o monto. Destildá <i>Cargar</i> "
@@ -49,7 +49,7 @@ PASOS = [
      "texto": "Mueve cada PDF a la carpeta de su proveedor, da de alta los nuevos y escribe las filas en la planilla. "
               "Todo se puede deshacer después.",
      "falta": "El botón aparece con un lote leído."},
-    {"tab": "tab-resultado", "sel": "tab-resultado", "titulo": "3. Resultado",
+    {"tab": "tab-resultado", "sel": "resultado", "titulo": "3. Resultado",
      "texto": "Qué se hizo con el último lote: archivos, filas, errores. Desde acá se reintenta lo que quedó "
               "pendiente o se deshace el lote."},
     {"tab": "tab-historial", "sel": "tanda", "titulo": "Historial: la tanda de pagos",
@@ -101,3 +101,66 @@ def marcar_visto(datos: Path, terminado: bool) -> None:
 def js() -> str:
     """The call that starts the tour in the page."""
     return f"window.ezRecorrido && window.ezRecorrido({json.dumps(PASOS, ensure_ascii=False)})"
+
+
+# ------------------------------------------------------------------ example batch shown during the tour
+
+def lote_demo(cfg):
+    """An invented batch, only in memory, so the Revisión steps show a real-looking grid, warnings and
+    the confirm button. It points at no file and cannot be confirmed (ui.py refuses while S.demo is on)."""
+    from datetime import date, timedelta
+    from decimal import Decimal as D
+
+    from .model import Archivo, Aviso, Estado, Extraccion, Factura, Fila, Lote, Nivel
+    hoy = date.today()
+    base = Path(cfg.base) if cfg and cfg.base else Path("Facturas pendientes")
+    lote = Lote(id="EJEMPLO", simular=True)
+    ejemplos = [
+        # id, provider, file, letter, amount, IVA (H), task, service, source, colour
+        ("f01", "Grúas del Ejemplo SRL", "factura_gruas.pdf", "A", D("100000.00"), None, "412345",
+         "Auxilio mecánico", "arca", ""),
+        ("f02", "Remolques Modelo", "remolque_0007.pdf", "C", D("58000.00"), D("0"), "412346",
+         "Remolque 40 km", "arca", "amarilla"),
+        ("f03", "Cerrajería Inventada", "cerrajeria.pdf", "B", D("36300.00"), D("0"), "412347",
+         "Apertura de puerta", "generico", "roja"),
+        ("f04", "Plomería de Muestra", "escaneada.pdf", "C", D("42000.00"), D("0"), "412348",
+         "Destapación", "claude", "violeta"),
+    ]
+    for i, (fid, prov, archivo, letra, monto, iva, tarea, servicio, fuente, color) in enumerate(ejemplos):
+        area = "Hogar" if fid in ("f03", "f04") else "Vehicular"
+        nro = 101 + i
+        ext = Extraccion(fuente=fuente, letra=letra, pv=3, nro=nro, razon_social=prov, emision=hoy - timedelta(days=5),
+                         vto=hoy + timedelta(days=25), total=monto + (iva or 0))
+        f = Factura(id=fid, archivo=Archivo(base / "_Entrada" / area / archivo, archivo, area, "carpeta"), ext=ext,
+                    estado=Estado.LISTA, proveedor=prov, carpeta=prov, texto_link=f"Factura 0003-{nro:08d}",
+                    proveedor_nuevo=(fid == "f01"))
+        lote.facturas.append(f)
+        lote.filas.append(Fila(factura_id=fid, hoja=area, proveedor=prov, tarea=tarea, servicio=servicio,
+                               fecha=ext.emision, vto=ext.vto, monto=monto, iva=iva, texto_link=f.texto_link,
+                               resaltar=(color == "amarilla"), excluida=(color == "roja"),
+                               bloqueada=(color == "roja"),
+                               comentario="Posible duplicado:\n- la tarea 412346 ya figura" if color == "amarilla" else ""))
+        if color != "roja":
+            lote.plan.append({"op": "mover", "de": str(f.archivo.ruta), "a": str(base / area / prov / f"{f.texto_link}.pdf"),
+                              "factura": fid})
+    lote.avisos += [
+        Aviso(Nivel.BLOQUEA, "mismo_numero", "cerrajeria.pdf: tiene el mismo número que otra factura pero otro importe "
+              "(ejemplo): no se carga hasta revisarla", "f03"),
+        Aviso(Nivel.REVISAR, "proveedor_nuevo", "factura_gruas.pdf: Grúas del Ejemplo SRL no está en proveedores.csv; "
+              "se agregaría como proveedor nuevo (ejemplo)", "f01"),
+        Aviso(Nivel.REVISAR, "posible_duplicado", "remolque_0007.pdf: la tarea 412346 ya figura en la planilla (ejemplo)",
+              "f02"),
+        Aviso(Nivel.REVISAR, "nota", "escaneada.pdf: la leyó Claude: revisá CUIT, número y montos (ejemplo)", "f04"),
+        Aviso(Nivel.INFO, "factura_c", "remolque_0007.pdf: es Factura C, H va en 0 (ejemplo)", "f02"),
+    ]
+    lote.contexto.update(proveedores_csv=12, guardadas=148, planilla="40 filas cargadas (ejemplo)")
+    return lote
+
+
+def resultado_demo() -> dict:
+    """What 'Resultado' shows after confirming, for the tour."""
+    return {"hechos": [r"factura_gruas.pdf -> Vehicular\Grúas del Ejemplo SRL\Factura 0003-00000101.pdf (ejemplo)",
+                       r"remolque_0007.pdf -> Vehicular\Remolques Modelo\Factura 0003-00000102.pdf (ejemplo)",
+                       r"escaneada.pdf -> Hogar\Plomería de Muestra\Factura 0003-00000104.pdf (ejemplo)"],
+            "errores": [], "excel": "escrito", "excel_mensaje": "", "excel_pendiente": 0,
+            "excel_escrito": {"filas": 3, "proveedores": 1}, "memoria": 0, "sin_archivo": 0}

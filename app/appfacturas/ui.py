@@ -93,6 +93,8 @@ class Estado_:
     log: list[str] = []
     ocupado: bool = False                 # a confirm, undo or retry is running: those buttons wait
     leer_ahora: dict = {}                 # client id -> read now (set by its Cargar panel; used by the header badge)
+    demo: bool = False                    # the tour is showing the example batch (nothing can be confirmed)
+    previo: tuple = (None, None, None)    # lote, resultado, trabajo before the example
 
 
 S = Estado_()
@@ -382,7 +384,11 @@ def pagina():
     from . import recorrido
     # the file's date in the URL: after an update the browser never keeps the old script
     ui.add_head_html(f'<script src="/ezfac/recorrido.js?v={int((STATIC / "recorrido.js").stat().st_mtime)}"></script>')
-    ui.on("ez_recorrido_fin", lambda e: recorrido.marcar_visto(datos(), bool((e.args or {}).get("terminado"))))
+    def fin_recorrido(e):
+        recorrido.marcar_visto(datos(), bool((e.args or {}).get("terminado")))
+        quitar_ejemplo()
+    ui.on("ez_recorrido_fin", fin_recorrido)
+    quitar_ejemplo(refrescar=False)       # a tour left open in a closed window never leaves its example behind
     S.cfg = cfg_activa()
     with ui.header().classes("ez-header items-center justify-between px-6 py-2"):
         with ui.row().classes("items-center gap-3"):
@@ -399,7 +405,7 @@ def pagina():
         # mode on the right and, last of all, Salir at the far right (also when the header wraps)
         with ui.row().classes("items-center gap-3 ml-auto"):
             lbl_modo = ui.label().classes("pill").props("data-tour=modo")
-            ui.button(icon="help_outline", on_click=lambda: ui.run_javascript(recorrido.js())).props(
+            ui.button(icon="help_outline", on_click=iniciar_recorrido).props(
                 "flat round color=white").tooltip("Recorrido por la app: qué hace cada parte")
             ui.button("Salir", icon="logout", on_click=_salir).props("flat color=white data-tour=salir")
 
@@ -439,7 +445,41 @@ def pagina():
                 panel_config(refrescar_modo)
     refrescar_modo()
     if not recorrido.visto(datos()):
-        ui.timer(1.5, lambda: ui.run_javascript(recorrido.js()), once=True)   # first start: the guided tour
+        ui.timer(1.5, iniciar_recorrido, once=True)   # first start: the guided tour
+
+
+def iniciar_recorrido() -> None:
+    """Starts the guided tour. Without a batch read, Revisión and Resultado show an invented example
+    (only in memory) so the steps about the grid, the warnings and the result look real."""
+    from . import recorrido
+    if S.lote is None and not S.demo:
+        S.previo = (S.lote, S.resultado, S.trabajo)
+        S.demo = True
+        S.lote = recorrido.lote_demo(S.cfg)
+        if S.resultado is None:
+            S.resultado, S.trabajo = recorrido.resultado_demo(), datos() / "lotes" / "EJEMPLO"
+        panel_revision.refresh()
+        panel_resultado.refresh()
+    ui.run_javascript(recorrido.js())
+
+
+def quitar_ejemplo(refrescar: bool = True) -> None:
+    if not S.demo:
+        return
+    S.lote, S.resultado, S.trabajo = S.previo
+    S.demo, S.previo = False, (None, None, None)
+    if refrescar:
+        panel_revision.refresh()
+        panel_resultado.refresh()
+
+
+def es_ejemplo(trabajo=None) -> bool:
+    """The example batch of the tour (never confirmed, undone or continued)."""
+    if (S.demo and trabajo is None) or (trabajo is not None and Path(trabajo).name == "EJEMPLO"):
+        ui.notify("Es el lote de ejemplo del recorrido: no se carga nada. Terminá el recorrido y leé tus facturas.",
+                  type="info", multi_line=True)
+        return True
+    return False
 
 
 @ui.refreshable
@@ -707,6 +747,8 @@ async def copiar():
 
 @de_a_uno
 async def confirmar(tabs, t_res):
+    if es_ejemplo():
+        return
     lote, cfg = S.lote, S.cfg
     excluidas = aplicar_exclusiones(lote)
     act = [r for r in lote.filas if not r.excluida]
@@ -757,6 +799,8 @@ async def _confirmado(tabs, t_res, lote, cfg):
 
 @de_a_uno
 async def continuar(trabajo: Path, con_archivos: bool = True):
+    if es_ejemplo(trabajo):
+        return
     if not puede_tocar(trabajo):
         ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
         return
@@ -961,9 +1005,10 @@ def panel_resultado():
         return
     est = ejecutor.estado(S.trabajo)
     ok = not r["errores"] and r["excel"] in ("escrito", "no corresponde")
-    xl = est.get("excel_escrito") or {}
+    xl = est.get("excel_escrito") or r.get("excel_escrito") or {}
     with ui.column().classes("w-full items-center gap-5"):
-        with seccion("Listo" if ok else "Listo, con cosas pendientes", "task_alt" if ok else "pending_actions", "w-[760px]"):
+        with seccion("Listo" if ok else "Listo, con cosas pendientes", "task_alt" if ok else "pending_actions",
+                     "w-[760px]").props("data-tour=resultado"):
             with ui.row().classes("justify-center gap-4"):
                 for titulo, valor in (("Pasos con archivos", str(len(r["hechos"]))), ("Errores", str(len(r["errores"]))),
                                       ("Filas en la planilla", str(xl.get("filas", 0))),
@@ -1005,6 +1050,8 @@ def panel_resultado():
 
 @de_a_uno
 async def deshacer(trabajo: Path):
+    if es_ejemplo(trabajo):
+        return
     if not puede_tocar(trabajo):
         ui.notify(SOLO_SIMULAR, type="warning", multi_line=True)
         return

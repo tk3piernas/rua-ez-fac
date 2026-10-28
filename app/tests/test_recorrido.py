@@ -28,3 +28,19 @@ def test_se_muestra_una_vez(tmp_path):
     recorrido.marcar_visto(tmp_path, terminado=False)
     assert recorrido.visto(tmp_path)
     assert "ezRecorrido" in recorrido.js() and "Bienvenido" in recorrido.js()
+
+
+def test_lote_de_ejemplo_para_el_recorrido():
+    """Revisión and Resultado show an invented batch during the tour: rows of every colour, warnings, a plan
+    and a result, with no real file behind them."""
+    from appfacturas import ui
+    from appfacturas.config import Config
+    lote = recorrido.lote_demo(Config())
+    filas = ui.filas_grid(lote)
+    assert lote.id == "EJEMPLO" and len(filas) == 4
+    assert [f["resaltar"] for f in filas].count(True) == 1 and [f["bloquea"] for f in filas].count(True) == 1
+    assert any(f["claude"] for f in filas)
+    assert {a.nivel.name for a in lote.avisos} >= {"BLOQUEA", "REVISAR", "INFO"}
+    assert all(not f.archivo.ruta.exists() for f in lote.facturas)
+    r = recorrido.resultado_demo()
+    assert r["excel"] == "escrito" and r["excel_escrito"]["filas"] == 3

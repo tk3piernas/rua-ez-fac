@@ -14,7 +14,7 @@ from nicegui import app, run, ui
 from . import NOMBRE, __version__, config, ejecutor, excel, reporte
 from .lote import Armador, Entrada, aplicar_exclusiones, entradas_de_carpeta
 from .model import Estado, Nivel
-from .util import ahora_id, fmt_fecha, fmt_monto, parse_fecha, parse_monto
+from .util import ahora_id, fmt_fecha, fmt_monto, parse_fecha, parse_monto, sha256
 
 CSS = """
 :root { --navy: #14147a; --naranja: #ff542c; --linea: #e3e6f0; }
@@ -243,7 +243,11 @@ def pagina():
                 ui.label(NOMBRE).classes("text-xl font-bold leading-tight")
                 ui.label(f"Carga de facturas de proveedores · v{__version__}").classes("text-xs opacity-75")
         lbl_modo = ui.label().classes("pill")
-        ui.button("Salir", icon="logout", on_click=_salir).props("flat color=white")
+        with ui.row().classes("items-center gap-1"):
+            ui.button("Abrir planilla", icon="table_view", on_click=abrir_planilla).props("flat color=white").tooltip(
+                "Abre en Excel la planilla en la que está escribiendo la app (la real o la copia de prueba)")
+            ui.button("Exportar planilla", icon="file_download", on_click=dialogo_exportar).props("flat color=white")
+            ui.button("Salir", icon="logout", on_click=_salir).props("flat color=white")
 
     def refrescar_modo():
         cfg = S.cfg
@@ -571,15 +575,23 @@ async def deshacer(trabajo: Path):
             ui.button("Cancelar", on_click=lambda: dlg.submit(False)).props("flat")
     if not await dlg:
         return
+    pagina_ = ui.context.client.layout          # the button may be gone when the undo ends (panels refresh)
     try:
         problemas = await run.io_bound(lambda: ejecutor.deshacer(trabajo, log=lambda s: None, cfg=S.cfg))
-    except Exception as ex:
-        ui.notify(f"No pude deshacer (no se cambió nada): {ex}", type="negative", multi_line=True)
+    except ejecutor.YaDeshecho as ex:
+        with pagina_:
+            ui.notify(f"No hice nada: {ex}.", type="info")
         return
-    if problemas:
-        ui.notify("Deshecho, salvo: " + "; ".join(problemas), type="warning", multi_line=True, timeout=0, close_button=True)
-    else:
-        ui.notify("Lote deshecho: todo volvió a como estaba.", type="positive")
+    except Exception as ex:
+        with pagina_:
+            ui.notify(f"No pude deshacer (no se cambió nada): {ex}", type="negative", multi_line=True)
+        return
+    with pagina_:
+        if problemas:
+            ui.notify("Deshecho, salvo: " + "; ".join(problemas), type="warning", multi_line=True, timeout=0,
+                      close_button=True)
+        else:
+            ui.notify("Lote deshecho: todo volvió a como estaba.", type="positive")
     S.resultado = None
     panel_resultado.refresh()
     panel_historial.refresh()
@@ -609,6 +621,70 @@ def panel_historial():
         if ultimo:
             ui.button(f"Deshacer el último lote confirmado ({ultimo.name})", icon="undo",
                       on_click=lambda: deshacer(ultimo)).props("color=negative outline")
+
+
+# ------------------------------------------------------------------ open / export the workbook
+
+def abrir_planilla() -> None:
+    r = S.cfg.planilla if S.cfg else None
+    if not r or not Path(r).is_file():
+        ui.notify(f"No encuentro la planilla ({r or 'sin configurar'}). Mirá Configuración → Setup.", type="warning",
+                  multi_line=True)
+        return
+    import os
+    os.startfile(r)
+    ui.notify(f"Abriendo {'la COPIA DE PRUEBA' if S.usar_prueba else Path(r).name}…")
+
+
+async def dialogo_exportar():
+    from . import preparar
+    cfg = S.cfg
+    if not cfg.planilla or not Path(cfg.planilla).is_file():
+        ui.notify(f"No encuentro la planilla ({cfg.planilla})", type="warning")
+        return
+    carpeta = Path(cfg.planilla).parent / preparar.CARPETA_EXPORTADAS
+    with ui.dialog() as dlg, ui.card().classes("seccion w-[620px] max-w-full items-center gap-3 p-6"):
+        ui.label("Exportar planilla").classes("titulo-seccion")
+        ui.label("Guarda una copia de la planilla tal como está ahora (si está abierta en Excel, con lo que tenga) "
+                 "con el nombre que elijas. La planilla sigue igual; si querés empezarla de cero, después usá "
+                 "Configuración → Reset.").classes("text-sm text-center text-gray-600")
+        nombre = ui.input("Nombre", value=f"DEUDA A PAGAR ARG {date.today():%d-%m-%Y}").classes("w-96")
+        ui.label(f"Se guarda en: {carpeta}").classes("text-xs text-center break-all " +
+                                                     ("chequeo-ok" if S.usar_prueba else "text-gray-500"))
+
+        hecho = {}
+
+        async def exportar():
+            try:
+                destino = await run.io_bound(preparar.exportar_planilla, cfg, nombre.value)
+            except Exception as ex:
+                ui.notify(f"No pude exportar: {ex}", type="negative", multi_line=True)
+                return
+            hecho.update(destino=destino, sha=sha256(destino))
+            botones.refresh()
+
+        def deshacer_export():
+            problema = preparar.borrar_exportacion(hecho["destino"], hecho["sha"])
+            ui.notify(problema or f"Listo: borré {hecho['destino'].name}", type="warning" if problema else "positive")
+            if not problema:
+                hecho.clear()
+                botones.refresh()
+
+        @ui.refreshable
+        def botones():
+            with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
+                if not hecho:
+                    ui.button("Exportar", icon="file_download", on_click=exportar).props("color=secondary unelevated")
+                    ui.button("Cancelar", on_click=dlg.close).props("flat")
+                    return
+                import os
+                ui.label(f"✔ Exportada: {hecho['destino'].name}").classes("w-full text-center font-bold chequeo-ok")
+                ui.button("Abrir", icon="open_in_new", on_click=lambda: os.startfile(hecho["destino"])).props("outline")
+                ui.button("Deshacer (borrar la copia)", icon="undo", on_click=deshacer_export).props(
+                    "color=negative outline")
+                ui.button("Cerrar", on_click=dlg.close).props("flat")
+        botones()
+    dlg.open()
 
 
 # ------------------------------------------------------------------ Proveedores

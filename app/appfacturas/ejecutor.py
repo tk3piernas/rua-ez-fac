@@ -14,6 +14,10 @@ from pathlib import Path
 from .model import Lote
 
 HIST_MEMORIA = "memoria_proveedores.json"
+
+
+class YaDeshecho(Exception):
+    """Undo asked twice for the same batch: nothing is touched."""
 from .util import ruta_libre, sha256, url_sharepoint
 
 ORDEN = {"proveedor_nuevo": 0, "mover": 1, "copiar": 1, "mover_zip": 2, "a_duplicados": 3, "txt_procesado": 4}
@@ -249,6 +253,8 @@ def deshacer(carpeta_lote: Path, log=print, cfg=None) -> list[str]:
     Returns the problems (things that changed after the batch). If the workbook can't be
     opened, nothing is undone (so rows never point to files that moved back)."""
     from . import excel
+    if estado(carpeta_lote).get("estado") == "deshecho":
+        raise YaDeshecho(f"el lote {carpeta_lote.name} ya estaba deshecho")
     pasos = Diario(carpeta_lote).pasos
     problemas: list[str] = []
     if excel.pasos_guardados(pasos):

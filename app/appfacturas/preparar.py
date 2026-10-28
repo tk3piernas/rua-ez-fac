@@ -266,3 +266,49 @@ def reset_planilla(cfg, backups: Path, vaciar_proveedores: bool = False, log=pri
         return {"filas": filas, "proveedores": provs, "respaldos": [str(c) for c in copias]}
     finally:
         libro.cerrar()
+
+
+# ------------------------------------------------------------------ export
+
+CARPETA_EXPORTADAS = "Planillas exportadas"
+
+
+def nombre_exportacion(nombre: str) -> str:
+    """A valid Windows file name ending in .xlsx (or "" if nothing is left)."""
+    import re
+    n = re.sub(r'[<>"|?*\x00-\x1f]', "", re.sub(r"[/\\:]", "-", nombre or "")).strip().rstrip(".")
+    if n.lower().endswith(".xlsx"):
+        n = n[:-5].rstrip()
+    return f"{n}.xlsx" if n else ""
+
+
+def exportar_planilla(cfg, nombre: str, log=print) -> Path:
+    """Saves a copy of the workbook (as Excel has it now) in 'Planillas exportadas', next to it.
+    Never overwrites: if the name exists it says so. Nothing else changes."""
+    if not cfg.planilla or not Path(cfg.planilla).is_file():
+        raise ExcelError(f"no encuentro la planilla ({cfg.planilla})")
+    archivo = nombre_exportacion(nombre)
+    if not archivo:
+        raise ExcelError("poné un nombre para la planilla exportada")
+    destino = Path(cfg.planilla).parent / CARPETA_EXPORTADAS / archivo
+    if destino.exists():
+        raise ExcelError(f"ya hay una planilla exportada con ese nombre ({destino.name}); elegí otro")
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    libro = abrir(cfg)
+    try:
+        libro.guardar_copia(destino)
+    finally:
+        libro.cerrar()
+    log(f"EXPORTADA {destino}")
+    return destino
+
+
+def borrar_exportacion(destino: Path, sha: str) -> str:
+    """Undo of an export: deletes the copy if nobody changed it. Returns a problem or ""."""
+    from .util import sha256
+    if not destino.exists():
+        return ""
+    if sha256(destino) != sha:
+        return f"{destino.name} cambió después de exportarla; no la borro"
+    destino.unlink()
+    return ""

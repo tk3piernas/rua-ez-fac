@@ -12,7 +12,7 @@ RUA EZ-Fac lee los PDF, zip y .txt que mandan los proveedores. Detecta duplicado
 
 Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
 
-- **Guía de uso (1 página):** [docs/Guia de uso RUA EZ-Fac.pdf](docs/Guia%20de%20uso%20RUA%20EZ-Fac.pdf)
+- **Guía de uso (2 páginas):** [docs/Guia de uso RUA EZ-Fac.pdf](docs/Guia%20de%20uso%20RUA%20EZ-Fac.pdf)
 - **Documentación técnica:** [docs/DOCUMENTACION.md](docs/DOCUMENTACION.md)
 
 ## Qué necesitás
@@ -44,6 +44,10 @@ Pestaña **Proveedores**: pegá los datos como vengan (mail, WhatsApp, .txt) y t
 
 La primera vez la app arranca con la **escritura real apagada**: sobre tus carpetas y tu planilla solo lee y simula. Para practicar, usá Configuración → *Trabajar sobre la carpeta de prueba*. Cuando estés seguro, prendé *Habilitar escritura real*.
 
+## Abrir y exportar la planilla
+
+Arriba a la derecha: **Abrir planilla** abre en Excel la planilla en la que está escribiendo la app (la real o la de prueba). **Exportar planilla** guarda una copia con el nombre que elijas en `Planillas exportadas`, al lado de la planilla; la planilla sigue igual. Si después querés empezarla de cero, usá el Reset.
+
 ## Empezar la planilla de cero
 
 **Configuración → Reset de la planilla…** (hay que escribir BORRAR). Vacía las filas 12–210 de las hojas de cada área en el mismo archivo, así los links compartidos siguen andando: vuelve a poner la fórmula del IVA, no toca la columna I ni el formato, y si querés también vacía Proveedores. Antes guarda dos respaldos.
@@ -66,7 +70,7 @@ requirements*.txt                      librerías con versión fija (ver docs pa
 app/appfacturas/                       código (Python + NiceGUI)
 app/tests/                             pruebas que corren sin facturas reales
 CLAUDE.md                              reglas para Claude Code (qué nunca se sube, cómo probar y publicar)
-docs/                                  guía de uso y documentación técnica
+docs/                                  guía de uso (PDF y su HTML en docs/guia), documentación técnica y prompt de revisión
 ```
 
 Lo que crea cada instalación queda fuera del repo: `.venv\`, `datos\` (lotes, informes, respaldos), `prueba\` y `config.toml`.

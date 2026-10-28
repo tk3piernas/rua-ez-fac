@@ -90,3 +90,30 @@ def test_agrega_hojas_de_areas_nuevas(tmp_path):
     assert [d.formula1 for d in ws.data_validations.dataValidation] == ["=Listas!$C$2:$C$50"]
     assert wb["Hogar"]["A12"].value == "Plomero X"
     assert preparar.hojas_faltantes(cfg.planilla) == []
+
+
+def test_exportar_copia_con_nombre_y_deshacer(tmp_path):
+    from appfacturas.util import sha256
+    cfg = _cfg(tmp_path)
+    preparar.crear_planilla_vacia(cfg.planilla)
+    destino = preparar.exportar_planilla(cfg, "Deuda 28/10 tanda 3", log=lambda s: None)
+    assert destino == cfg.planilla.parent / "Planillas exportadas" / "Deuda 28-10 tanda 3.xlsx"
+    assert sha256(destino) == sha256(cfg.planilla)
+    try:
+        preparar.exportar_planilla(cfg, "Deuda 28-10 tanda 3.xlsx", log=lambda s: None)
+        assert False, "no debería pisar"
+    except preparar.ExcelError as e:
+        assert "ya hay" in str(e)
+    assert preparar.borrar_exportacion(destino, sha256(destino)) == "" and not destino.exists()
+
+
+def test_deshacer_dos_veces_no_toca_nada(tmp_path):
+    import json
+    import pytest
+    from appfacturas import ejecutor
+    lote = tmp_path / "L1"
+    lote.mkdir()
+    (lote / "estado.json").write_text(json.dumps({"estado": "deshecho", "problemas_deshacer": []}), encoding="utf-8")
+    with pytest.raises(ejecutor.YaDeshecho):
+        ejecutor.deshacer(lote, log=lambda s: None)
+    assert json.loads((lote / "estado.json").read_text(encoding="utf-8"))["problemas_deshacer"] == []

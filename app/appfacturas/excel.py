@@ -69,6 +69,9 @@ class LibroOpenpyxl:
     def guardar(self):
         self.wb.save(self.ruta)
 
+    def guardar_copia(self, destino: Path):
+        shutil.copy2(self.ruta, destino)
+
     def cerrar(self):
         self.wb.close()
 
@@ -217,6 +220,10 @@ class LibroCOM:
 
     def guardar(self):
         self.wb.Save()
+
+    def guardar_copia(self, destino: Path):
+        """Copy with what Excel has now (also unsaved changes); the open workbook stays as it is."""
+        self.wb.SaveCopyAs(str(destino))
 
     def cerrar(self):
         try:

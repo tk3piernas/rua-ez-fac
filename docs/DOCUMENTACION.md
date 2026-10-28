@@ -1,13 +1,13 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.7.0 (alfa, 27/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular y Hogar).
+Versión 0.8.0 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
 1. Lee PDF, zip y .txt de proveedores, ya sea desde `Facturas pendientes\_Entrada\<Área>` o subidos desde la pantalla Cargar.
 2. Saca los datos de cada factura: CUIT, tipo, punto de venta y número, fechas, montos, IVA, ítems y N° de tarea.
 3. Detecta duplicados contra la planilla, contra las carpetas de cada proveedor y dentro del mismo lote.
-4. Arma las filas para `DEUDA A PAGAR ARG.xlsx` y las de la hoja Proveedores para los proveedores nuevos.
+4. Arma las filas para `DEUDA A PAGAR ARG.xlsx` y las de la hoja Proveedores para los proveedores nuevos o que no estén en la hoja (con los datos de la memoria de proveedores si los tiene).
 5. Muestra todo en Revisión. Ahí se puede editar, excluir y confirmar.
 6. Al confirmar:
    - renombra y mueve los PDF a la carpeta del proveedor, dentro del OneDrive sincronizado;
@@ -21,7 +21,8 @@ Versión 0.7.0 (alfa, 27/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a 
 |---|---|
 | App, entorno de Python, accesos directos y configuración | `Documentos\<carpeta de la app>\`. **Nunca en OneDrive**: el OneDrive de RUA bloquea .exe, .bat, .ps1 y .py. |
 | Facturas | `OneDrive - Rua Asistencia\Facturas pendientes\` (carpeta sincronizada; no se usa Graph ni Azure) |
-| Planilla | `OneDrive - Rua Asistencia\DEUDA A PAGAR ARG.xlsx` (hojas Vehicular, Hogar y Proveedores) |
+| Planilla | `OneDrive - Rua Asistencia\DEUDA A PAGAR ARG.xlsx` (una hoja por área y Proveedores) |
+| Memoria de proveedores | `OneDrive - Rua Asistencia\PROVEEDORES RUA.xlsx` (hoja Proveedores, columnas A–O como la hoja de la planilla + P Actualizado) |
 | Registro de proveedores | `Facturas pendientes\_Script\proveedores.csv` (`CUIT;Area;Nombre;Carpeta`, UTF-8) |
 | Lotes, informes, diario, respaldos y log | `<app>\datos\lotes\<id>\`, `<app>\datos\backups\`, `<app>\datos\app.log` |
 | Carpeta de prueba | `<app>\prueba\OneDrive - Rua Asistencia\` (copia de lo real y de la planilla) |
@@ -67,12 +68,12 @@ Estructura de la carpeta de la app:
 - El ícono abre un servidor local (NiceGUI) en `127.0.0.1:8765`. No es accesible desde otra PC.
 - Cuando el servidor está listo, abre la app en una ventana propia de Edge, o de Chrome si no está Edge, con `--app=`: sin pestañas ni barra de direcciones. Si no encuentra ninguno de los dos, usa el navegador predeterminado.
 - Con `pythonw` no hay consola: lo que pasa queda en `datos\app.log`.
-- El botón Salir apaga el servidor, y lo fuerza a los 1,5 segundos si algo lo retiene.
+- El botón Salir cierra la ventana de la app (si el navegador no la deja cerrarse, muestra "RUA EZ-Fac se cerró") y apaga el servidor; lo fuerza a los 1,5 segundos si algo lo retiene.
 
 ## Pantallas
 
 1. **Cargar:**
-   - Área de lo que subís: Vehicular, Hogar o detectar por proveedor.
+   - Área de lo que subís: Vehicular, Hogar, Persona, ServiciosYa o detectar por proveedor.
    - Subir archivos: se copian a `datos\entrada_ui`; los originales quedan donde estaban.
    - Cuánto hay para leer.
    - Botón Leer facturas: no mueve ni escribe nada.
@@ -83,21 +84,27 @@ Estructura de la carpeta de la app:
    - Botones Confirmar y Copiar al portapapeles.
 3. **Resultado:** lo que se hizo. Acciones: reintentar la planilla, copiar al portapapeles, deshacer.
 4. **Historial:** los lotes anteriores y la opción de deshacer el último confirmado.
-5. **Configuración:**
+5. **Proveedores** (`maestro.py`): memoria de datos de proveedores en `PROVEEDORES RUA.xlsx`.
+   - Cuadro para pegar texto (mail, WhatsApp, .txt): lo lee el mismo lector de los .txt y arma una ficha editable con chequeos (dígito verificador de CUIT y CBU, banco del CBU). Si el proveedor ya está, muestra qué cambia.
+   - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita la escritura real habilitada o la carpeta de prueba.
+   - Al leer un lote, los proveedores que no están en la hoja Proveedores de la planilla toman sus datos de la memoria. Al confirmar, los datos de los .txt (y lo que se sacó de las facturas, solo para completar vacíos) se guardan en la memoria; deshacer el lote los vuelve atrás.
+   - Historial de cambios en `datos\memoria_proveedores.json` (los de cada lote, en la carpeta del lote). Botón para deshacer el último cambio: solo vuelve atrás filas que nadie tocó después; si la app había creado el archivo y queda vacío, lo borra.
+6. **Configuración:**
    - **Setup** (ver abajo): crea lo que falte y muestra el chequeo.
    - Carpeta de prueba sí o no, y rearmarla.
    - **Habilitar escritura real** (`[app] modo_real`, apagado por defecto). Mientras está apagado, lo real solo se simula.
    - **Empezar la planilla de cero** (reset, ver abajo).
    - Una fila por ítem o una por factura; escribir el servicio en la columna C.
-- Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. Abajo a la derecha hay un aviso de versión alfa (gatito: "Esto es una alfa · mandar bugs o sugerencias a Matheo"), que se cierra con la X.
+- Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. Abajo a la derecha hay un aviso de versión alfa (foto de Simba: "¡ESTO ES UNA ALPHA! Mandar bugs y sugerencias a Matheo"), que se cierra con la X.
 
 ## Setup (preparar.py)
 
 - Botón **Configuración → Setup → Revisar y preparar todo**.
 - Busca el OneDrive de RUA (`OneDriveCommercial` o `%USERPROFILE%\OneDrive - *`, prefiriendo el que dice Rua) y muestra **qué va a crear** antes de hacerlo. Nunca pisa nada que exista.
   - En la app: `datos\`, `datos\lotes`, `datos\backups`, `datos\entrada_ui`.
-  - En el OneDrive: `Facturas pendientes` con `_Entrada\Vehicular`, `_Entrada\Hogar`, `_Entrada\_Duplicados`, `_Entrada\_Procesados`, `Vehicular`, `Hogar`, `_Script` y `_Script\proveedores.csv` (solo el encabezado `CUIT;Area;Proveedor;Carpeta`).
-  - Si no hay planilla, crea una **vacía** con la misma estructura: hojas Vehicular y Hogar (B4 alícuota, B5 `=TODAY()`, resumen H4:I9, encabezados en la fila 11, filas 12–210 con las fórmulas de H e I, formato de fechas y montos, colores de vencido / vence pronto, lista desplegable de Empresa desde la hoja Listas), Proveedores (encabezados A–O en la fila 4) y Listas.
+  - En el OneDrive: `Facturas pendientes` con `_Entrada\<área>` para cada área, `_Entrada\_Duplicados`, `_Entrada\_Procesados`, una carpeta por área, `_Script` y `_Script\proveedores.csv` (solo el encabezado `CUIT;Area;Proveedor;Carpeta`).
+  - Si no hay planilla, crea una **vacía** con la misma estructura: una hoja por área (B4 alícuota, B5 `=TODAY()`, resumen H4:I9, encabezados en la fila 11, filas 12–210 con las fórmulas de H e I, formato de fechas y montos, colores de vencido / vence pronto, lista desplegable de Empresa desde la hoja Listas, una columna por área), Proveedores (encabezados A–O en la fila 4) y Listas.
+  - Si la planilla existe pero le faltan hojas de área (por ejemplo una de antes de Persona y ServiciosYa), las agrega como copia vacía de la última hoja de área: mismo formato, fórmulas y resumen, título y lista de Empresa propios. Antes guarda dos respaldos (al lado de la planilla y en `datos\backups`). En la planilla real necesita la escritura real habilitada. Mientras falte la hoja, las facturas de esa área quedan frenadas con un aviso.
 - Después muestra el **chequeo** (lo mismo que `appfacturas verificar`): librerías, carpetas, `proveedores.csv`, planilla y hojas, link de SharePoint, Excel y Edge, con OK / FALTA.
 - Si no encuentra el OneDrive de RUA sincronizado, no crea nada en la nube y lo avisa.
 
@@ -106,7 +113,7 @@ Estructura de la carpeta de la app:
 - Botón **Configuración → Empezar la planilla de cero → Reset de la planilla…**. Para confirmar hay que escribir BORRAR.
 - Trabaja sobre la planilla activa: la copia de prueba, o la real solo si está habilitada la escritura real.
 - No crea un archivo nuevo: vacía **el mismo** archivo, así los links compartidos de OneDrive siguen andando.
-  - Vehicular y Hogar, filas 12–210: borra valores de A–G y J, links, comentarios y rellenos.
+  - Las hojas de cada área, filas 12–210: borra valores de A–G y J, links, comentarios y rellenos.
   - Vuelve a poner la fórmula de H, tomada de una fila que la conserve (o `=IF(G="","",ROUND(G*$B$4,2))`).
   - La columna I no se toca. El encabezado, el resumen, el formato y las listas quedan.
   - Opcional: vaciar también Proveedores A5:O300.

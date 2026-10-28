@@ -51,7 +51,7 @@ def test_reset_vacia_en_el_lugar_y_respalda(tmp_path):
     wb.save(cfg.planilla)
 
     res = preparar.reset_planilla(cfg, tmp_path / "backups", vaciar_proveedores=False, log=lambda s: None)
-    assert res["filas"] == {"Vehicular": 2, "Hogar": 0}
+    assert res["filas"] == {"Vehicular": 2, "Hogar": 0, "Persona": 0, "ServiciosYa": 0}
     assert len(res["respaldos"]) == 2 and all(__import__("pathlib").Path(p).is_file() for p in res["respaldos"])
 
     wb = load_workbook(cfg.planilla)
@@ -67,3 +67,26 @@ def test_reset_vacia_en_el_lugar_y_respalda(tmp_path):
 
     preparar.reset_planilla(cfg, tmp_path / "backups", vaciar_proveedores=True, log=lambda s: None)
     assert load_workbook(cfg.planilla)["Proveedores"]["B5"].value is None
+
+
+def test_agrega_hojas_de_areas_nuevas(tmp_path):
+    """A workbook from before Persona / ServiciosYa gets them as empty copies of Hogar; the rest is kept."""
+    cfg = _cfg(tmp_path)
+    preparar.crear_planilla_vacia(cfg.planilla)
+    wb = load_workbook(cfg.planilla)
+    del wb["Persona"], wb["ServiciosYa"]
+    wb["Hogar"]["A12"], wb["Hogar"]["G12"] = "Plomero X", 1000
+    wb.save(cfg.planilla)
+    assert preparar.hojas_faltantes(cfg.planilla) == ["Persona", "ServiciosYa"]
+    assert preparar.plan_setup(cfg)["hojas"] == ["Persona", "ServiciosYa"]
+
+    res = preparar.agregar_hojas(cfg, tmp_path / "backups", log=lambda s: None)
+    assert res["hojas"] == ["Persona", "ServiciosYa"] and len(res["respaldos"]) == 2
+    wb = load_workbook(cfg.planilla)
+    assert wb.sheetnames[:4] == ["Vehicular", "Hogar", "Persona", "ServiciosYa"]
+    ws = wb["Persona"]
+    assert ws["A1"].value == "Deuda a pagar · Persona" and ws["A11"].value == "Proveedor"
+    assert ws["A12"].value is None and ws["H12"].value == '=IF(G12="","",ROUND(G12*$B$4,2))'
+    assert [d.formula1 for d in ws.data_validations.dataValidation] == ["=Listas!$C$2:$C$50"]
+    assert wb["Hogar"]["A12"].value == "Plomero X"
+    assert preparar.hojas_faltantes(cfg.planilla) == []

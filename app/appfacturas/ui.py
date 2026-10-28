@@ -243,7 +243,7 @@ def pagina():
                 ui.label(NOMBRE).classes("text-xl font-bold leading-tight")
                 ui.label(f"Carga de facturas de proveedores · v{__version__}").classes("text-xs opacity-75")
         lbl_modo = ui.label().classes("pill")
-        ui.button("Salir", icon="logout", on_click=lambda: (ui.notify("Cerrando la app…"), _salir())).props("flat color=white")
+        ui.button("Salir", icon="logout", on_click=_salir).props("flat color=white")
 
     def refrescar_modo():
         cfg = S.cfg
@@ -261,6 +261,7 @@ def pagina():
             t_rev = ui.tab("Revisión", icon="fact_check")
             t_res = ui.tab("Resultado", icon="task_alt")
             t_hist = ui.tab("Historial", icon="history")
+            t_prov = ui.tab("Proveedores", icon="contacts")
             t_conf = ui.tab("Configuración", icon="settings")
         with ui.tab_panels(tabs, value=t_cargar).classes("w-full bg-transparent"):
             with ui.tab_panel(t_cargar).classes("items-center"):
@@ -271,6 +272,8 @@ def pagina():
                 panel_resultado()
             with ui.tab_panel(t_hist).classes("items-center"):
                 panel_historial()
+            with ui.tab_panel(t_prov).classes("items-center"):
+                panel_proveedores()
             with ui.tab_panel(t_conf).classes("items-center"):
                 panel_config(refrescar_modo)
     refrescar_modo()
@@ -280,10 +283,10 @@ def pagina():
 def aviso_alfa() -> None:
     with ui.card().classes("alfa p-3") as tarjeta_alfa:
         with ui.row().classes("w-full items-center no-wrap gap-3"):
-            ui.image("/ezfac/gatito.svg").classes("w-20 h-20 shrink-0")
+            ui.image("/ezfac/simba.png").classes("w-20 h-20 shrink-0 rounded-xl").props("fit=cover")
             with ui.column().classes("gap-0 grow"):
-                ui.label("Esto es una alfa").classes("font-bold text-base").style("color: var(--navy)")
-                ui.label("Mandar bugs o sugerencias a Matheo").classes("text-sm text-gray-600")
+                ui.label("¡ESTO ES UNA ALPHA!").classes("font-bold text-base").style("color: var(--navy)")
+                ui.label("Mandar bugs y sugerencias a Matheo").classes("text-sm text-gray-600")
             ui.button(icon="close", on_click=lambda: tarjeta_alfa.set_visibility(False)).props(
                 "flat round dense size=sm color=grey-7").classes("self-start")
 
@@ -293,7 +296,7 @@ def aviso_alfa() -> None:
 def panel_cargar(tabs, t_rev, refrescar_modo):
     with ui.row().classes("w-full justify-center items-stretch gap-6"):
         with seccion("1. Archivos", "upload_file", "w-[420px]"):
-            area = ui.select({"": "Detectar por proveedor", "Vehicular": "Vehicular", "Hogar": "Hogar"},
+            area = ui.select({"": "Detectar por proveedor", **{a: a for a in config.AREAS}},
                              value="", label="Área de lo que subís").classes("w-72")
 
             async def subido(e):
@@ -311,9 +314,8 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
             def contar():
                 c = contar_entrada(S.cfg) if S.cfg.base else {}
                 with ui.column().classes("items-center gap-1"):
-                    for etiqueta, n in ((r"_Entrada\Vehicular", c.get("Vehicular", 0)),
-                                        (r"_Entrada\Hogar", c.get("Hogar", 0)),
-                                        ("Subidos acá", c.get("subidos", 0))):
+                    for etiqueta, n in ([(f"_Entrada\\{a}", c.get(a, 0)) for a in config.AREAS]
+                                        + [("Subidos acá", c.get("subidos", 0))]):
                         with ui.row().classes("gap-2 items-baseline"):
                             ui.label(etiqueta).classes("text-sm text-gray-600")
                             ui.label(str(n)).classes("text-xl font-bold").style("color: var(--navy)")
@@ -609,6 +611,138 @@ def panel_historial():
                       on_click=lambda: deshacer(ultimo)).props("color=negative outline")
 
 
+# ------------------------------------------------------------------ Proveedores
+
+def hist_memoria() -> Path:
+    return datos() / "memoria_proveedores.json"
+
+
+def panel_proveedores():
+    """Paste a provider's details, check them and keep them in PROVEEDORES RUA.xlsx (the provider memory)."""
+    from . import maestro
+    F = {"vals": None, "avisos": []}
+
+    def leer():
+        if not (texto.value or "").strip():
+            ui.notify("Pegá primero el texto con los datos", type="warning")
+            return
+        F["vals"], F["avisos"] = maestro.desde_texto(texto.value, area.value)
+        ficha.refresh()
+
+    async def guardar():
+        cfg = S.cfg
+        if not puede_escribir(cfg):
+            ui.notify("Para guardar en la memoria real primero habilitá la escritura real (o usá la carpeta de prueba).",
+                      type="warning", multi_line=True)
+            return
+        if not F["vals"][1] and not F["vals"][2]:
+            ui.notify("Falta el nombre o el CUIT del proveedor", type="warning")
+            return
+        try:
+            cambios = await run.io_bound(maestro.guardar, cfg, [(F["vals"], False)], hist_memoria(), "pegado a mano")
+        except Exception as ex:
+            ui.notify(f"No pude guardar: {ex}", type="negative", multi_line=True)
+            return
+        ui.notify(f"{F['vals'][1]}: guardado en la memoria" if cambios else "No había nada nuevo para guardar",
+                  type="positive" if cambios else "info")
+        F["vals"] = None
+        texto.value = ""
+        ficha.refresh()
+        memoria.refresh()
+
+    async def deshacer_memoria():
+        try:
+            problemas = await run.io_bound(maestro.deshacer, S.cfg, hist_memoria())
+        except Exception as ex:
+            ui.notify(f"No pude deshacer: {ex}", type="negative", multi_line=True)
+            return
+        ui.notify("Listo: el último cambio se deshizo" + (". Avisos: " + "; ".join(problemas) if problemas else ""),
+                  type="warning" if problemas else "positive", multi_line=True)
+        memoria.refresh()
+
+    with ui.row().classes("w-full justify-center items-start gap-6"):
+        with seccion("Pegar datos de un proveedor", "content_paste", "w-[480px]"):
+            ui.label("Pegá el texto como venga (mail, WhatsApp, .txt). La app saca CUIT, CBU/CVU, alias, banco y "
+                     "contacto, los chequea y te muestra la ficha para revisar antes de guardar.").classes(
+                "text-sm text-gray-600 text-center")
+            texto = ui.textarea(placeholder="Razón social: ...\nCUIT: ...\nCBU: ...\nAlias: ...").props(
+                "outlined").classes("w-full").style("min-height: 220px")
+            area = ui.select({"": "Sin área", **{a: a for a in config.AREAS}}, value="", label="Área").classes("w-60")
+            ui.button("Leer los datos", icon="auto_fix_high", on_click=leer).props("color=secondary unelevated")
+
+        with seccion("Ficha del proveedor", "badge", "w-[640px]"):
+            @ui.refreshable
+            def ficha():
+                if F["vals"] is None:
+                    ui.label("Pegá un texto y tocá 'Leer los datos'.").classes("text-gray-500")
+                    return
+                vals = F["vals"]
+
+                def cambiar(i, v):
+                    vals[i] = str(v or "").strip()
+                    chequeo.refresh()
+                with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-1"):
+                    for i, col in enumerate(maestro.COLS[1:], start=1):
+                        ui.input(col, value=vals[i], on_change=lambda e, i=i: cambiar(i, e.value)).props(
+                            "dense").classes("w-full")
+
+                @ui.refreshable
+                def chequeo():
+                    for ok, t in maestro.chequeos(vals):
+                        ui.label(("✔ " if ok else "⚠ ") + t).classes("text-sm " + ("chequeo-ok" if ok else "chequeo-aviso"))
+                    for a in F["avisos"]:
+                        ui.label("⚠ " + a).classes("text-sm chequeo-aviso")
+                    ya = maestro.buscar(maestro.leer(S.cfg), maestro.solo_digitos(vals[2]), vals[1])
+                    if ya:
+                        difs = maestro.diferencias(ya["valores"], maestro.combinar(ya["valores"], vals))
+                        ui.label(f"Ya está en la memoria (fila {ya['fila']})" + (": cambia" if difs else ": sin cambios")
+                                 ).classes("text-sm font-bold")
+                        for col, a, d in difs:
+                            ui.label(f"{col}: {a or '(vacío)'} → {d}").classes("text-xs")
+                    else:
+                        ui.label("Proveedor nuevo en la memoria").classes("text-sm font-bold")
+                with ui.column().classes("w-full gap-0"):
+                    chequeo()
+                ui.button("Guardar en la memoria", icon="save", on_click=guardar).props("color=primary unelevated")
+            ficha()
+
+    @ui.refreshable
+    def memoria():
+        cfg = S.cfg
+        r = maestro.ruta(cfg)
+        with seccion("Memoria de proveedores", "inventory_2", "w-[1150px] max-w-full"):
+            try:
+                mem = maestro.leer(cfg)
+            except Exception as ex:
+                ui.label(f"No pude leer {maestro.NOMBRE}: {ex}").classes("chequeo-falta")
+                return
+            ui.label(f"{len(mem)} proveedores en {r or 'la planilla de proveedores'}"
+                     + ("" if r and r.is_file() else " (se crea con el primer guardado)")).classes("text-sm text-gray-600 break-all")
+            if mem:
+                filas = [{"area": m["valores"][0], "nombre": m["valores"][1], "cuit": m["valores"][2],
+                          "banco": m["valores"][8], "cbu": m["valores"][11], "alias": m["valores"][12],
+                          "contacto": m["valores"][5]} for m in mem.values()]
+                ui.aggrid({"columnDefs": [{"field": "area", "headerName": "Área", "width": 100},
+                                          {"field": "nombre", "headerName": "Proveedor", "flex": 1, "minWidth": 200},
+                                          {"field": "cuit", "headerName": "CUIT", "width": 120},
+                                          {"field": "banco", "headerName": "Banco", "width": 150},
+                                          {"field": "cbu", "headerName": "CBU / CVU", "width": 190},
+                                          {"field": "alias", "headerName": "Alias", "width": 150},
+                                          {"field": "contacto", "headerName": "Contacto", "width": 150}],
+                           "defaultColDef": {"filter": True, "sortable": True}, "rowData": filas},
+                          theme="balham").classes("w-full").style(f"height: {min(500, 64 + 28 * len(filas))}px")
+            with ui.row().classes("gap-3"):
+                if r and r.is_file() and sys.platform == "win32":
+                    import os
+                    ui.button("Abrir la planilla de proveedores", icon="open_in_new",
+                              on_click=lambda: os.startfile(r)).props("outline")
+                u = maestro.ultimo(hist_memoria())
+                if u:
+                    ui.button(f"Deshacer el último cambio ({u['fecha'].replace('T', ' ')[:16]})", icon="undo",
+                              on_click=deshacer_memoria).props("color=negative outline")
+    memoria()
+
+
 # ------------------------------------------------------------------ Configuración
 
 def panel_config(refrescar_modo):
@@ -653,7 +787,7 @@ def panel_config(refrescar_modo):
             ui.switch("Habilitar escritura real", value=cfg_real.modo_real, on_change=cambiar_real)
 
         with seccion("Empezar la planilla de cero", "restart_alt", "w-[760px]"):
-            ui.label("Deja vacías las filas 12 a 210 de Vehicular y Hogar: valores, colores, comentarios y links. "
+            ui.label("Deja vacías las filas 12 a 210 de las hojas de cada área: valores, colores, comentarios y links. "
                      "Vuelve a poner la fórmula del IVA en H, no toca la columna I ni el formato, y es el mismo "
                      "archivo (los links compartidos siguen andando). Antes guarda dos copias de respaldo.").classes(
                 "text-sm text-gray-600 text-center")
@@ -704,12 +838,13 @@ async def dialogo_setup():
             if plan["sin_onedrive"]:
                 ui.label("No encuentro el OneDrive de RUA sincronizado en esta PC (carpeta 'OneDrive - Rua Asistencia'). "
                          "Abrí OneDrive, iniciá sesión con tu cuenta de RUA y volvé a tocar Setup.").classes("text-red-700 text-sm")
-            pend = plan["dirs"] + plan["archivos"]
+            pend = plan["dirs"] + plan["archivos"] + plan["hojas"]
             if pend:
                 ui.label(f"Voy a crear {len(pend)} cosas:").classes("font-bold")
                 with ui.column().classes("gap-0 w-full"):
                     for x in pend:
-                        tipo = "archivo" if x in plan["archivos"] else "carpeta"
+                        tipo = ("hoja de la planilla (copia vacía de otra área; antes guarda un respaldo)"
+                                if x in plan["hojas"] else "archivo" if x in plan["archivos"] else "carpeta")
                         ui.label(f"• {tipo}: {x}").classes("text-xs break-all")
             else:
                 ui.label("No falta crear nada.").classes("font-bold chequeo-ok")
@@ -720,6 +855,10 @@ async def dialogo_setup():
 
         async def crear():
             nonlocal plan, ok, lineas
+            if plan["hojas"] and not cfg_real.modo_real:
+                ui.notify("Las hojas nuevas de la planilla real se agregan con la escritura real habilitada "
+                          "(Configuración). Ahora creo solo las carpetas y archivos.", type="warning", multi_line=True)
+                plan = {**plan, "hojas": []}
             try:
                 hecho = await run.io_bound(preparar.ejecutar_setup, cfg_real, plan)
             except Exception as ex:
@@ -730,11 +869,11 @@ async def dialogo_setup():
             ok, lineas = await run.io_bound(instalacion.chequeo)
             S.cfg = cfg_activa()
             cuerpo.refresh()
-            btn.set_visibility(bool(plan["dirs"] or plan["archivos"]))
+            btn.set_visibility(bool(plan["dirs"] or plan["archivos"] or plan["hojas"]))
 
         with ui.row().classes("dialogo-botones w-full justify-center gap-3"):
             btn = ui.button("Crear lo que falta", icon="add_circle", on_click=crear).props("color=secondary unelevated")
-            btn.set_visibility(bool(plan["dirs"] or plan["archivos"]))
+            btn.set_visibility(bool(plan["dirs"] or plan["archivos"] or plan["hojas"]))
             ui.button("Cerrar", on_click=dlg.close).props("flat")
     dlg.open()
 
@@ -750,7 +889,7 @@ async def dialogo_reset():
         ui.label("Reset de la planilla").classes("titulo-seccion")
         ui.label(f"{'COPIA DE PRUEBA' if S.usar_prueba else 'PLANILLA REAL'}: {cfg.planilla}").classes(
             "text-xs text-center break-all " + ("chequeo-ok" if S.usar_prueba else "chequeo-falta"))
-        ui.label("Se vacían las filas cargadas de Vehicular y Hogar. Antes se guardan dos copias: una al lado de la "
+        ui.label(f"Se vacían las filas cargadas de {', '.join(config.AREAS[:-1])} y {config.AREAS[-1]}. Antes se guardan dos copias: una al lado de la "
                  "planilla y otra en datos\\backups.").classes("text-sm text-center")
         provs = ui.checkbox("También vaciar la hoja Proveedores")
         conf = ui.input("Escribí BORRAR para confirmar").classes("w-64")
@@ -785,12 +924,24 @@ def _puerto_ocupado(p: int) -> bool:
         return s.connect_ex(("127.0.0.1", p)) == 0
 
 
-def _salir() -> None:
-    """Stop the server; if something keeps it alive, force the exit a moment later."""
+CERRADA_JS = """
+document.body.innerHTML = '<div style="height:100vh;display:flex;align-items:center;justify-content:center;'
+  + 'font-family:Segoe UI,sans-serif;color:#14147a;font-size:1.3rem;background:#f6f7fc">'
+  + 'RUA EZ-Fac se cerró. Ya podés cerrar esta ventana.</div>';
+setTimeout(() => window.close(), 200);
+"""
+
+
+async def _salir() -> None:
+    """Close the app window (the browser only lets the page close itself), then stop the server.
+    If the window can't close, it shows that the app is closed; if something keeps the server alive, force the exit."""
+    import asyncio
     import os
     import threading
-    app.shutdown()
+    ui.run_javascript(CERRADA_JS)
+    await asyncio.sleep(0.6)           # let the browser get the script before the server goes away
     threading.Timer(1.5, lambda: os._exit(0)).start()
+    app.shutdown()
 
 
 @app.get("/api/version")

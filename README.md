@@ -2,7 +2,7 @@
 
 <h1 align="center">RUA EZ-Fac</h1>
 
-<p align="center">Carga de facturas de proveedores de RUA Asistencia (Vehicular y Hogar) en <code>DEUDA A PAGAR ARG.xlsx</code>.</p>
+<p align="center">Carga de facturas de proveedores de RUA Asistencia (Vehicular, Hogar, Persona y ServiciosYa) en <code>DEUDA A PAGAR ARG.xlsx</code>.</p>
 
 RUA EZ-Fac lee los PDF, zip y .txt que mandan los proveedores. Detecta duplicados y te muestra todo para revisar antes de cargar. Cuando confirmás:
 
@@ -19,8 +19,9 @@ Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
 
 - Windows con Excel de escritorio.
 - El OneDrive de RUA sincronizado en la PC, con:
-  - `Facturas pendientes`, que adentro tiene `_Entrada\Vehicular`, `_Entrada\Hogar`, `Vehicular`, `Hogar` y `_Script\proveedores.csv`;
-  - `DEUDA A PAGAR ARG.xlsx` en la raíz, con las hojas Vehicular, Hogar y Proveedores.
+  - `Facturas pendientes`, que adentro tiene `_Entrada\<área>` y `<área>` para cada área (Vehicular, Hogar, Persona y ServiciosYa) y `_Script\proveedores.csv`;
+  - `DEUDA A PAGAR ARG.xlsx` en la raíz, con una hoja por área y la hoja Proveedores (si faltan Persona o ServiciosYa, Setup las agrega como copia vacía de las otras);
+  - `PROVEEDORES RUA.xlsx` al lado de la planilla: la memoria de datos de proveedores (la crea la app con el primer guardado).
 - Python 3.15. Si no lo tenés, el instalador te lo consigue.
 
 ¿Te falta alguna carpeta o la planilla? Abrí la app y tocá **Configuración → Setup → Revisar y preparar todo**: crea lo que falte (también una planilla vacía con la misma estructura) y te muestra un chequeo con OK / FALTA.
@@ -35,13 +36,17 @@ Cada lote se puede deshacer. Reemplaza al script `OrdenarFacturas.ps1`.
    - La primera vez tarda unos minutos.
    - Al final te muestra una lista de OK / FALTA y queda el ícono **RUA EZ-Fac** en el Escritorio.
 
-> **Versión alfa.** Mandá bugs o sugerencias a Matheo.
+> **¡Esto es una alpha!** Mandá bugs y sugerencias a Matheo.
+
+## Datos de proveedores
+
+Pestaña **Proveedores**: pegá los datos como vengan (mail, WhatsApp, .txt) y tocá *Leer los datos*. La app saca CUIT, CBU/CVU, alias, banco y contacto, chequea el CUIT y el CBU y te muestra la ficha para corregir antes de guardar. Se guardan en `PROVEEDORES RUA.xlsx` (OneDrive, al lado de la planilla), que no se toca con las actualizaciones. Cuando un lote trae un proveedor que no está en la hoja Proveedores de la planilla, la app copia sus datos desde ahí; y los datos que llegan en .txt con un lote se guardan solos. Cada cambio se puede deshacer.
 
 La primera vez la app arranca con la **escritura real apagada**: sobre tus carpetas y tu planilla solo lee y simula. Para practicar, usá Configuración → *Trabajar sobre la carpeta de prueba*. Cuando estés seguro, prendé *Habilitar escritura real*.
 
 ## Empezar la planilla de cero
 
-**Configuración → Reset de la planilla…** (hay que escribir BORRAR). Vacía las filas 12–210 de Vehicular y Hogar en el mismo archivo, así los links compartidos siguen andando: vuelve a poner la fórmula del IVA, no toca la columna I ni el formato, y si querés también vacía Proveedores. Antes guarda dos respaldos.
+**Configuración → Reset de la planilla…** (hay que escribir BORRAR). Vacía las filas 12–210 de las hojas de cada área en el mismo archivo, así los links compartidos siguen andando: vuelve a poner la fórmula del IVA, no toca la columna I ni el formato, y si querés también vacía Proveedores. Antes guarda dos respaldos.
 
 ## Actualizar
 

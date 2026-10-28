@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import ejecutor, paridad, reporte
-from .config import carpeta_app, cargar
+from .config import AREAS, carpeta_app, cargar
 from .lote import Armador, entradas_de_carpeta
 from .util import ahora_id, sha256
 
@@ -80,7 +80,7 @@ def prueba_mover(salida: Path) -> bool:
 
 # ---------------------------------------------------------------------------- stage 4
 
-def foto_libro(ruta: Path, hojas=("Vehicular", "Hogar", "Proveedores"), filas=300, cols=15) -> dict:
+def foto_libro(ruta: Path, hojas=AREAS + ("Proveedores",), filas=300, cols=15) -> dict:
     """Cell contents (values/formulas), fill and comment of the workbook, read from the saved file."""
     import openpyxl
     wb = openpyxl.load_workbook(ruta)

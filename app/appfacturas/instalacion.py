@@ -55,7 +55,8 @@ def chequeo() -> tuple[bool, list[str]]:
         r.append('      o poné la ruta en config.toml > [rutas] facturas_pendientes.')
     else:
         r.append(f"OK    Facturas pendientes: {cfg.base}")
-        for sub in ("_Entrada\\Vehicular", "_Entrada\\Hogar", "_Entrada\\_Duplicados", "_Entrada\\_Procesados", "Vehicular", "Hogar"):
+        for sub in ([f"_Entrada\\{a}" for a in config.AREAS] + ["_Entrada\\_Duplicados", "_Entrada\\_Procesados"]
+                    + list(config.AREAS)):
             p = cfg.base.joinpath(*sub.split("\\"))
             r.append(f"{_ok(p.is_dir())} {sub}" + ("" if p.is_dir() else "  (Setup la crea)"))
         r.append(f"{_ok(cfg.csv_proveedores.is_file())} _Script\\proveedores.csv"
@@ -65,8 +66,8 @@ def chequeo() -> tuple[bool, list[str]]:
         try:
             from openpyxl import load_workbook
             wb = load_workbook(cfg.planilla, read_only=True)
-            for h in ("Vehicular", "Hogar", "Proveedores"):
-                r.append(f"{_ok(h in wb.sheetnames)} hoja {h}")
+            for h in config.AREAS + ("Proveedores",):
+                r.append(f"{_ok(h in wb.sheetnames)} hoja {h}" + ("" if h in wb.sheetnames else "  (Setup la agrega)"))
             wb.close()
         except Exception as ex:
             r.append(f"AVISO no pude abrir la planilla para revisarla: {ex}")

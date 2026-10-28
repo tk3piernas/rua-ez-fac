@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import unquote
 
+from .config import AREAS
 from .util import solo_digitos
 
 PRIMERA, ULTIMA = 12, 210
@@ -35,6 +36,7 @@ class Planilla:
     proveedores: list[dict] = field(default_factory=list)
     alicuota: dict = field(default_factory=dict)      # sheet -> B4
     error: str = ""
+    faltan: list = field(default_factory=list)         # area sheets the workbook doesn't have (Setup adds them)
 
     @property
     def leida(self) -> bool:
@@ -55,7 +57,7 @@ def _dec(v):
     return None
 
 
-def leer(ruta: Path | None, hojas=("Vehicular", "Hogar")) -> Planilla:
+def leer(ruta: Path | None, hojas=AREAS) -> Planilla:
     pl = Planilla(ruta)
     if not ruta or not ruta.exists():
         pl.error = f"no encontré la planilla ({ruta})"
@@ -69,7 +71,7 @@ def leer(ruta: Path | None, hojas=("Vehicular", "Hogar")) -> Planilla:
     try:
         for h in hojas:
             if h not in wb.sheetnames:
-                pl.error = f"la planilla no tiene la hoja {h}"
+                pl.faltan.append(h)
                 continue
             ws = wb[h]
             b4 = ws["B4"].value

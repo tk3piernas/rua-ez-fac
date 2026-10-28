@@ -13,7 +13,7 @@ from urllib.parse import unquote
 
 from . import parsers, pdf
 from . import planilla as pl_mod
-from . import txt_proveedor
+from . import maestro, txt_proveedor
 from .bancos import banco_de
 from .carpetas import Indice, clave, clave_nf
 from .config import Config
@@ -33,7 +33,7 @@ class Entrada:
 
 
 def entradas_de_carpeta(cfg: Config) -> tuple[list[Entrada], list[tuple[Path, str]]]:
-    """Files waiting in _Entrada\\Vehicular and _Entrada\\Hogar: (pdf/zip entries, txt files)."""
+    """Files waiting in _Entrada\\<area>: (pdf/zip entries, txt files)."""
     out, txts = [], []
     for a in cfg.areas:
         d = cfg.entrada / a
@@ -158,8 +158,11 @@ class Armador:
             if prov and prov.area:
                 arch.area, arch.area_origen = prov.area, "proveedor"
             else:
-                self.lote.aviso(Nivel.BLOQUEA, "sin_area", f"{nombre}: no sé si es Vehicular u Hogar (elegilo)", f.id)
+                self.lote.aviso(Nivel.BLOQUEA, "sin_area", f"{nombre}: no sé de qué área es (elegila)", f.id)
         area = arch.area
+        if area and area in self.pl.faltan:
+            self.lote.aviso(Nivel.BLOQUEA, "sin_hoja", f"{nombre}: la planilla no tiene la hoja {area}. "
+                            "Agregala desde Configuración → Setup (crea una copia vacía de las otras).", f.id)
         if not prov:
             nombre_p, origen = sugerencia
             clave_p = e.cuit if fiscal_ok else clave_sin_cuit(nombre_p)
@@ -385,6 +388,11 @@ class Armador:
         por_cbu = {r["cbu"]: r for r in hoja if r.get("cbu")}
         filas: dict[str, dict] = {}
         validas = [f for f in self.lote.facturas if f.ext and f.proveedor_clave and f.estado != Estado.DUPLICADA]
+        try:
+            memoria = maestro.leer(self.cfg)
+        except Exception as ex:
+            memoria = {}
+            self.lote.aviso(Nivel.INFO, "memoria", f"No pude leer {maestro.NOMBRE}: {ex}")
 
         def en_hoja(cuit, nombre):
             return por_cuit.get(cuit) if cuit else por_nombre.get(norm(nombre))
@@ -452,6 +460,17 @@ class Armador:
                     c0.alias if c0 else "", (c0.titular if c0 else "") or d.titular or d.contacto, ". ".join(obs)]
             filas[prov.clave if prov else f"txt:{d.archivo.name}"] = {"origen": d.archivo.name, "valores": vals}
 
+        # providers of this batch missing from the Proveedores sheet whose details are in the memory
+        for f in validas:
+            p = self.reg.buscar(f.proveedor_clave)
+            if not p or p.clave in filas or en_hoja(p.cuit, p.nombre):
+                continue
+            m = maestro.buscar(memoria, p.cuit, p.nombre)
+            if m:
+                vals = list(m["valores"])
+                vals[0] = vals[0] or p.area
+                filas[p.clave] = {"origen": maestro.NOMBRE, "valores": vals, "de_memoria": True}
+
         for p in self.reg.nuevos.values():
             fs = [f for f in validas if f.proveedor_clave == p.clave]
             if not fs or p.clave in filas or en_hoja(p.cuit, p.nombre):
@@ -466,7 +485,10 @@ class Armador:
                 obs.append("Banco deducido del CBU")
             vals = [p.area, p.nombre, p.cuit, e.condicion_emisor, e.domicilio, "", "", "",
                     banco_de(e.cbu) if e.cbu else "", "", "", e.cbu, "", "", ". ".join(obs)]
-            filas[p.clave] = {"origen": fs[0].texto_link, "valores": vals}
+            filas[p.clave] = {"origen": fs[0].texto_link, "valores": vals, "solo_vacios": True}
+            if not e.cbu:
+                self.lote.aviso(Nivel.INFO, "sin_datos", f"{p.nombre}: no tengo sus datos bancarios ni de contacto; "
+                                "pegalos en la pestaña Proveedores y la app los recuerda")
         self.lote.proveedores = [{"clave": k, **v} for k, v in filas.items()]
 
     # ------------------------------------------------------------ rows

@@ -6,6 +6,9 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# invoice areas: one input folder, one provider folder and one workbook sheet each
+AREAS = ("Vehicular", "Hogar", "Persona", "ServiciosYa")
+
 PLANTILLA = '''# Configuración de RUA EZ-Fac. Se puede editar con el Bloc de notas.
 # Si una ruta queda vacía, la app la busca sola (igual que el script viejo).
 
@@ -63,7 +66,7 @@ class Config:
     modo_real: bool = False
     excel_motor: str = "com"          # "openpyxl" only in tests (there is no Excel in the cloud)
     archivo: Path | None = None
-    areas: tuple = ("Vehicular", "Hogar")
+    areas: tuple = AREAS
 
     @property
     def entrada(self) -> Path:

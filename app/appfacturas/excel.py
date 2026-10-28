@@ -56,6 +56,16 @@ class LibroOpenpyxl:
             raise ExcelError(f"la planilla no tiene la hoja {nombre}")
         return HojaOpenpyxl(self.wb[nombre])
 
+    def nombres(self) -> list[str]:
+        return list(self.wb.sheetnames)
+
+    def copiar_hoja(self, modelo: str, nombre: str):
+        """New sheet `nombre` right after `modelo`, with its layout (formats, formulas, widths)."""
+        ws = self.wb.copy_worksheet(self.wb[modelo])
+        ws.title = nombre
+        self.wb.move_sheet(ws, self.wb.sheetnames.index(modelo) + 1 - self.wb.sheetnames.index(nombre))
+        return HojaOpenpyxl(ws)
+
     def guardar(self):
         self.wb.save(self.ruta)
 
@@ -106,6 +116,15 @@ class HojaOpenpyxl:
                 cell.value = None
                 cell.hyperlink = None
                 cell.comment = None
+
+    def lista(self, rango, formula):
+        """Dropdown (data validation) for `rango`, replacing the one copied from the model sheet."""
+        from openpyxl.worksheet.datavalidation import DataValidation
+        self.ws.data_validations.dataValidation = [d for d in self.ws.data_validations.dataValidation
+                                                   if str(d.sqref) != rango]
+        dv = DataValidation(type="list", formula1=formula, allow_blank=True)
+        self.ws.add_data_validation(dv)
+        dv.add(rango)
 
     def vaciar_rango(self, rango, sin_columna="I", formula_h_desde=None):
         """Data rows back to empty: values, fills, comments and links; H gets its formula back; I untouched."""
@@ -185,6 +204,17 @@ class LibroCOM:
         except Exception as e:
             raise ExcelError(f"la planilla no tiene la hoja {nombre}") from e
 
+    def nombres(self) -> list[str]:
+        return [self.wb.Worksheets(i).Name for i in range(1, self.wb.Worksheets.Count + 1)]
+
+    def copiar_hoja(self, modelo: str, nombre: str):
+        """New sheet `nombre` right after `modelo`, with its layout (formats, formulas, widths)."""
+        m = self.wb.Worksheets(modelo)
+        m.Copy(None, m)                       # Copy(Before, After)
+        ws = self.wb.Worksheets(m.Index + 1)
+        ws.Name = nombre
+        return HojaCOM(ws)
+
     def guardar(self):
         self.wb.Save()
 
@@ -253,6 +283,12 @@ class HojaCOM:
         rg.Hyperlinks.Delete()
         rg.ClearContents()
         rg.ClearComments()
+
+    def lista(self, rango, formula):
+        """Dropdown (data validation) for `rango`, replacing the one copied from the model sheet."""
+        v = self.ws.Range(rango).Validation
+        v.Delete()
+        v.Add(3, 1, 1, formula)               # xlValidateList, xlValidAlertStop, xlBetween
 
     def vaciar_rango(self, rango, sin_columna="I", formula_h_desde=None):
         """Data rows back to empty: values, fills, comments and links; H gets its formula back; I untouched."""

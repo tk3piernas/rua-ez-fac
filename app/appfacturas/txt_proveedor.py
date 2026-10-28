@@ -67,8 +67,12 @@ def _tipo_cuenta(s: str) -> str:
 
 
 def leer(p: Path) -> DatosTxt:
-    t = leer_texto(p)
-    d = DatosTxt(p)
+    return desde_texto(leer_texto(p), p)
+
+
+def desde_texto(t: str, origen: Path = Path("texto pegado")) -> DatosTxt:
+    """Same reading for a .txt and for text pasted in the app (mail, WhatsApp...)."""
+    d = DatosTxt(origen)
     d.nombre = _campo(t, r"Proveedor|Nombre\s+de\s+fantas[ií]a|Raz[oó]n\s+social|Empresa")
     m = re.search(r"(?i)\b(?:CUIT|CUIL)\b\s*[:\-]?\s*(\d{2}[-\s.]?\d{8}[-\s.]?\d)", t)
     if m:

@@ -8,17 +8,17 @@ from pathlib import Path
 
 from . import config
 from .excel import PRIMERA, ULTIMA, ExcelError, abrir
+from .maestro import COLS
 
-AREAS = ("Vehicular", "Hogar")
-SUBCARPETAS = ["_Entrada/Vehicular", "_Entrada/Hogar", "_Entrada/_Duplicados", "_Entrada/_Procesados",
-               "Vehicular", "Hogar", "_Script"]
+AREAS = config.AREAS
+SUBCARPETAS = ([f"_Entrada/{a}" for a in AREAS] + ["_Entrada/_Duplicados", "_Entrada/_Procesados"]
+               + list(AREAS) + ["_Script"])
 CSV_ENCABEZADO = "CUIT;Area;Proveedor;Carpeta\r\n"
 NOMBRE_PLANILLA = "DEUDA A PAGAR ARG.xlsx"
+COL_LISTA = "ABCDEFGH"                                     # Listas column with the companies of each area
 H_R1C1 = '=IF(RC[-1]="","",ROUND(RC[-1]*R4C2,2))'          # H = G * B4 (IVA)
 I_R1C1 = '=IF(RC[-2]="","",RC[-2]+RC[-1])'                 # I = G + H
-COLS_PROVEEDORES = ["Área", "Proveedor", "CUIT", "Condición frente al IVA", "Domicilio", "Contacto (nombre)",
-                    "Teléfono", "Email", "Banco", "Tipo de cuenta", "N° de cuenta", "CBU / CVU", "Alias",
-                    "Titular de la cuenta", "Observaciones"]
+COLS_PROVEEDORES = COLS
 
 
 # ------------------------------------------------------------------ where things go
@@ -57,8 +57,9 @@ def plan_setup(cfg) -> dict:
     planilla = cfg.planilla or (raiz / NOMBRE_PLANILLA if raiz else None)
     if planilla and not planilla.is_file():
         crear_archivos.append(planilla)
+    hojas = hojas_faltantes(planilla) if planilla and planilla.is_file() else []
     return {"base": base, "raiz": raiz, "planilla": planilla, "dirs": crear_dirs, "archivos": crear_archivos,
-            "sin_onedrive": base is None}
+            "hojas": hojas, "sin_onedrive": base is None}
 
 
 def ejecutar_setup(cfg, plan: dict | None = None) -> list[str]:
@@ -76,7 +77,62 @@ def ejecutar_setup(cfg, plan: dict | None = None) -> list[str]:
         elif f.suffix.lower() == ".xlsx":
             crear_planilla_vacia(f)
         hecho.append(f"Archivo creado: {f}")
+    if plan.get("hojas"):
+        cfg_p = cfg if cfg.planilla else config.Config(base=plan["base"], planilla=plan["planilla"],
+                                                       excel_motor=cfg.excel_motor)
+        res = agregar_hojas(cfg_p, config.carpeta_app() / "datos" / "backups")
+        hecho += [f"Hoja agregada a la planilla: {h}" for h in res["hojas"]]
     return hecho
+
+
+# ------------------------------------------------------------------ area sheets missing in the workbook
+
+def hojas_faltantes(planilla: Path) -> list[str]:
+    """Area sheets the workbook doesn't have yet (e.g. a workbook from before Persona / ServiciosYa)."""
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(planilla, read_only=True)
+        nombres = wb.sheetnames
+        wb.close()
+    except Exception:
+        return []
+    return [a for a in AREAS if a not in nombres]
+
+
+def agregar_hojas(cfg, backups: Path, log=print) -> dict:
+    """Adds the missing area sheets as empty copies of the last existing area sheet (same layout, formulas
+    and summary). Before, a backup copy of the workbook (to undo: put the copy back)."""
+    libro = abrir(cfg)
+    try:
+        if not libro.saved:
+            raise ExcelError("la planilla está abierta con cambios sin guardar: guardala o cerrala y volvé a probar")
+        nombres = libro.nombres()
+        faltan = [a for a in AREAS if a not in nombres]
+        if not faltan:
+            return {"hojas": [], "respaldos": []}
+        modelo = next((a for a in reversed(AREAS) if a in nombres), None)
+        if not modelo:
+            raise ExcelError("la planilla no tiene ninguna hoja de área para copiar")
+        copias = respaldo(Path(cfg.planilla), backups, "antes de agregar hojas")
+        for area in faltan:
+            h = libro.copiar_hoja(modelo, area)
+            titulo = h.valor(1, "A")
+            if isinstance(titulo, str) and modelo in titulo:
+                h.poner(1, "A", titulo.replace(modelo, area))
+            ref = next((r for r in range(PRIMERA, ULTIMA + 1) if str(h.formula(r, "H")).startswith("=")), None)
+            h.vaciar_rango(f"A{PRIMERA}:J{ULTIMA}", sin_columna="I", formula_h_desde=ref)
+            col = COL_LISTA[AREAS.index(area)]
+            if "Listas" in nombres:
+                hl = libro.hoja("Listas")
+                if hl.valor(1, col) in ("", None):
+                    hl.poner(1, col, f"Empresas {area}")
+                h.lista(f"D{PRIMERA}:D{ULTIMA}", f"=Listas!${col}$2:${col}$50")
+            log(f"Hoja {area} agregada (copia vacía de {modelo})")
+            modelo = area
+        libro.guardar()
+        return {"hojas": faltan, "respaldos": [str(c) for c in copias]}
+    finally:
+        libro.cerrar()
 
 
 # ------------------------------------------------------------------ new empty workbook
@@ -139,7 +195,7 @@ def crear_planilla_vacia(ruta: Path) -> Path:
         ws.conditional_formatting.add(f"A{PRIMERA}:J{ULTIMA}", FormulaRule(
             formula=[f'AND($F{PRIMERA}<>"",$F{PRIMERA}>=$B$5,$F{PRIMERA}<=$B$5+7,$A{PRIMERA}<>"")'],
             fill=PatternFill("solid", fgColor="FFF6D5")))
-        dv = DataValidation(type="list", formula1=f"=Listas!${'AB'[i]}$2:${'AB'[i]}$50", allow_blank=True)
+        dv = DataValidation(type="list", formula1=f"=Listas!${COL_LISTA[i]}$2:${COL_LISTA[i]}$50", allow_blank=True)
         ws.add_data_validation(dv)
         dv.add(f"D{PRIMERA}:D{ULTIMA}")
     wp = wb.create_sheet("Proveedores")
@@ -155,10 +211,10 @@ def crear_planilla_vacia(ruta: Path) -> Path:
             wp.cell(r, c).number_format = "@"
     wp.freeze_panes = "A5"
     wl = wb.create_sheet("Listas")
-    wl["A1"], wl["B1"] = "Empresas Vehicular", "Empresas Hogar"
-    for c in ("A1", "B1"):
-        wl[c].font = Font(bold=True, color=naranja)
-    wl.column_dimensions["A"].width = wl.column_dimensions["B"].width = 28
+    for i, area in enumerate(AREAS):
+        c = wl[f"{COL_LISTA[i]}1"]
+        c.value, c.font = f"Empresas {area}", Font(bold=True, color=naranja)
+        wl.column_dimensions[COL_LISTA[i]].width = 28
     ruta.parent.mkdir(parents=True, exist_ok=True)
     wb.save(ruta)
     return ruta
@@ -167,11 +223,15 @@ def crear_planilla_vacia(ruta: Path) -> Path:
 # ------------------------------------------------------------------ reset
 
 def respaldo_reset(planilla: Path, backups: Path) -> list[Path]:
-    """Two copies before a reset: next to the workbook (OneDrive keeps it) and in datos\\backups."""
+    return respaldo(planilla, backups, "antes del reset")
+
+
+def respaldo(planilla: Path, backups: Path, motivo: str) -> list[Path]:
+    """Two copies before a big change: next to the workbook (OneDrive keeps it) and in datos\\backups."""
     marca = f"{datetime.now():%Y-%m-%d %H%M}"
-    junto = planilla.with_name(f"{planilla.stem} - respaldo antes del reset {marca}{planilla.suffix}")
+    junto = planilla.with_name(f"{planilla.stem} - respaldo {motivo} {marca}{planilla.suffix}")
     backups.mkdir(parents=True, exist_ok=True)
-    local = backups / f"{datetime.now():%Y-%m-%d_%H%M%S} antes del reset {planilla.name}"
+    local = backups / f"{datetime.now():%Y-%m-%d_%H%M%S} {motivo} {planilla.name}"
     shutil.copy2(planilla, junto)
     shutil.copy2(planilla, local)
     return [junto, local]
@@ -189,7 +249,8 @@ def reset_planilla(cfg, backups: Path, vaciar_proveedores: bool = False, log=pri
             raise ExcelError("la planilla está abierta con cambios sin guardar: guardala o cerrala y volvé a probar")
         copias = respaldo_reset(Path(cfg.planilla), backups)
         filas = {}
-        for area in AREAS:
+        nombres = libro.nombres()
+        for area in (a for a in AREAS if a in nombres):
             h = libro.hoja(area)
             filas[area] = sum(1 for r in range(PRIMERA, ULTIMA + 1) if h.formula(r, "A") not in ("", None))
             ref = next((r for r in range(PRIMERA, ULTIMA + 1) if str(h.formula(r, "H")).startswith("=")), None)

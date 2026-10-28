@@ -12,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 
 from .model import Lote
+
+HIST_MEMORIA = "memoria_proveedores.json"
 from .util import ruta_libre, sha256, url_sharepoint
 
 ORDEN = {"proveedor_nuevo": 0, "mover": 1, "copiar": 1, "mover_zip": 2, "a_duplicados": 3, "txt_procesado": 4}
@@ -98,6 +100,7 @@ class Ejecutor:
             else:
                 excel_estado, excel_msg, excel_res = escribir_excel(self.cfg, self.lote, self.diario, self.carpeta,
                                                                     self.guardar_cambios_usuario, self.log)
+        memoria = self._guardar_memoria()
         pendientes = [] if excel_estado != "pendiente" else [1] * (len(self.lote.filas) + len(self.lote.proveedores))
         _guardar_estado(self.carpeta, estado="confirmado" if not self.errores else "confirmado con errores",
                         fin=datetime.now().isoformat(timespec="seconds"), errores=self.errores,
@@ -105,7 +108,20 @@ class Ejecutor:
         (self.carpeta / "lote_confirmado.json").write_text(
             json.dumps(self.lote, default=_a_json, ensure_ascii=False, indent=1), encoding="utf-8")
         return {"hechos": self.hechos, "errores": self.errores, "excel_pendiente": len(pendientes),
-                "excel": excel_estado, "excel_mensaje": excel_msg, "excel_escrito": excel_res}
+                "excel": excel_estado, "excel_mensaje": excel_msg, "excel_escrito": excel_res, "memoria": memoria}
+
+    def _guardar_memoria(self) -> int:
+        """Provider details of this batch (.txt and invoices) into PROVEEDORES RUA.xlsx; never stops the batch."""
+        from . import maestro
+        fichas = [(p["valores"], p.get("solo_vacios", False)) for p in self.lote.proveedores if not p.get("de_memoria")]
+        if not fichas:
+            return 0
+        try:
+            return len(maestro.guardar(self.cfg, fichas, self.carpeta / HIST_MEMORIA, f"lote {self.carpeta.name}", self.log))
+        except Exception as ex:
+            self.log(f"MEMORIA no pude guardar los datos de proveedores: {ex}")
+            self.errores.append(f"memoria de proveedores: {ex}")
+            return 0
 
     # ---------------------------------------------------------------- steps
     def _proveedor_nuevo(self, p: dict) -> None:
@@ -240,6 +256,15 @@ def deshacer(carpeta_lote: Path, log=print, cfg=None) -> list[str]:
             from .config import cargar
             cfg = cargar()
         problemas += excel.deshacer_excel(cfg, pasos, log=log)
+    if (carpeta_lote / HIST_MEMORIA).is_file():
+        from . import maestro
+        if cfg is None:
+            from .config import cargar
+            cfg = cargar()
+        try:
+            problemas += maestro.deshacer(cfg, carpeta_lote / HIST_MEMORIA, todo=True, log=log)
+        except Exception as ex:
+            problemas.append(f"memoria de proveedores: {ex}")
     for p in reversed(pasos):
         op = p["op"]
         try:

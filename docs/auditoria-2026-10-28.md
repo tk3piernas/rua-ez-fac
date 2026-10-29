@@ -2,7 +2,10 @@
 
 Solo lectura: no se cambió código ni se tocó nada real. Se corrieron las dos tandas de tests (152 públicos, 33 privados) y la prueba con Excel de verdad (`-m excel`, sobre carpetas temporales): todas pasan.
 
-**Estado:** el lote 1 (A1, A2, A4, M1 y el test de la CLI) quedó hecho en la 0.19.4.
+**Estado:**
+- El lote 1 (A1, A2, A4, M1 y el test de la CLI) quedó hecho en la 0.19.4.
+- El lote 2 (A3 y M2) quedó hecho en la 0.19.5.
+- M3: Matheo decidió que la I se siga pintando; quedó anotado en CLAUDE.md.
 
 Esfuerzo: **chico** = menos de una hora con test; **mediano** = media jornada; **grande** = varios días.
 

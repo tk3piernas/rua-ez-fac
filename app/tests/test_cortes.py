@@ -71,3 +71,47 @@ def test_borrar_un_pedido_a_claude_va_a_la_papelera(tmp_path, monkeypatch):
     otra.mkdir()
     with pytest.raises(ValueError):
         claude_cowork.borrar(otra)
+
+
+def _planilla_cortada(tmp_path, guardada: bool):
+    """A batch whose Excel run was cut: the journal has the row but neither 'excel_guardado' nor 'excel_revertido'."""
+    from openpyxl import load_workbook
+    from appfacturas import preparar
+    from appfacturas.config import Config
+    pl = tmp_path / "OneDrive - Rua Asistencia" / "DEUDA A PAGAR ARG.xlsx"
+    preparar.crear_planilla_vacia(pl)
+    link = '=HYPERLINK("https://ejemplo.invalid/f.pdf","Factura 0001-00000001")'
+    if guardada:
+        wb = load_workbook(pl)
+        wb["Vehicular"]["A12"], wb["Vehicular"]["J12"] = "Remolques Inventados", link
+        wb.save(pl)
+    lote = tmp_path / "lote"
+    d = ejecutor.Diario(lote)
+    d.anotar({"op": "respaldo_excel", "ruta": "x"})
+    d.anotar({"op": "fila_excel", "libro": str(pl), "hoja": "Vehicular", "fila": 12,
+              "antes": {c: "" for c in "ABCDEFGHIJ"}, "escrito": {"A": "Remolques Inventados", "J": link},
+              "colores": {}, "comentario_antes": None, "comentado": False, "factura": "f1"})
+    return Config(base=pl.parent / "Facturas pendientes", planilla=pl, excel_motor="openpyxl"), d, lote, pl
+
+
+@pytest.mark.parametrize("guardada", [True, False])
+def test_escritura_cortada_se_decide_mirando_la_planilla(tmp_path, guardada):
+    from appfacturas import excel
+    cfg, d, _, _ = _planilla_cortada(tmp_path, guardada)
+    assert excel.reconocer_cortada(cfg, d, log=lambda s: None) is guardada
+    assert bool(excel.pasos_guardados(d.pasos)) is guardada                 # saved rows are never written twice
+    assert excel.tanda_cortada(d.pasos) == [] and excel.reconocer_cortada(cfg, d) is None
+
+
+def test_deshacer_saca_las_filas_de_una_escritura_cortada(tmp_path):
+    from openpyxl import load_workbook
+    cfg, _, lote, pl = _planilla_cortada(tmp_path, guardada=True)
+    assert ejecutor.deshacer(lote, log=lambda s: None, cfg=cfg) == []
+    ws = load_workbook(pl)["Vehicular"]
+    assert ws["A12"].value is None and ws["J12"].value is None
+
+
+def test_terminar_excel_no_toca_lo_que_no_es_excel():
+    import os
+    from appfacturas import excel
+    assert excel._terminar_excel(os.getpid()) is False                     # this python is still alive

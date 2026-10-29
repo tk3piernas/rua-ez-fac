@@ -159,12 +159,22 @@ class Ejecutor:
 
     def _terminar(self) -> dict:
         """Rows (only those not written yet, and never those whose file did not move), memory and state."""
+        from . import excel
+        cortada = ""
+        if self.con_excel and excel.tanda_cortada(self.diario.pasos):
+            try:
+                excel.reconocer_cortada(self.cfg, self.diario, self.log)
+            except Exception as ex:                # decided later: never write those rows a second time
+                cortada = str(ex)
+                self.log(f"EXCEL pendiente: {ex}")
         sin_archivo = _sin_archivo(self.lote, self.diario.pasos)
         a_escribir = _sin_lo_escrito(self.lote, self.diario.pasos, sin_archivo)
         ya_escrito = bool(_escritas(self.diario.pasos)[0])
         excel_estado, excel_msg, excel_res = ("escrito" if ya_escrito else "no corresponde"), "", {"filas": 0, "proveedores": 0}
         if a_escribir.filas or a_escribir.proveedores:
-            if not self.con_excel:
+            if cortada:
+                excel_estado, excel_msg = "pendiente", cortada
+            elif not self.con_excel:
                 excel_estado = "pendiente"
             else:
                 excel_estado, excel_msg, excel_res = escribir_excel(self.cfg, a_escribir, self.diario, self.carpeta,
@@ -419,6 +429,11 @@ def _deshacer(carpeta_lote: Path, log, cfg) -> list[str]:
     from . import excel
     diario = Diario(carpeta_lote)
     diario.completar_cortados()                  # a file moved right before the app closed also goes back
+    if excel.tanda_cortada(diario.pasos):        # rows saved right before the app closed also go
+        if cfg is None:
+            from .config import cargar
+            cfg = cargar()
+        excel.reconocer_cortada(cfg, diario, log)
     pasos = diario.pasos
     problemas: list[str] = []
     memoria_pendiente = False

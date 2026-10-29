@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.19.4 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.19.5 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -245,10 +245,11 @@ Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <
 - **Si la planilla está abierta:** la busca en la Running Object Table y escribe en esa misma ventana. Solo toma el libro cuya ruta local es exactamente la de la planilla, o cuya URL de SharePoint completa es la de la planilla real de `config.toml` (también lo verifica con `FullName`). En la carpeta de prueba no se usa ninguna URL, así que nunca escribe en la planilla real aunque esté abierta, ni en una exportada con el mismo nombre.
 - **Si algo falla a mitad con la planilla abierta:** revierte las celdas y deja el libro como guardado, para que el reintento no pida guardar cambios que no hizo nadie.
 - **Si está cerrada:** abre un Excel oculto, guarda y cierra.
+- **Excel colgado:** la app guarda el número de proceso del Excel oculto que abre. Si al cerrar no responde, termina ese proceso (solo si es EXCEL.EXE), así no queda en segundo plano trabando a los siguientes. Nunca toca un Excel abierto por el usuario.
 - **Si Excel no responde** ("Call was rejected by callee", porque está arrancando o tiene un cartel escondido): reintenta abrir la planilla durante 20 segundos. Si sigue sin responder, no toca nada y pide cerrar los "Microsoft Excel" del Administrador de tareas y abrir Excel una vez a mano.
 - **Fila libre:** la primera fila entre la 12 y la 210 con A–G y J vacías.
 - **Columna J:** `=HYPERLINK("url","Factura 0002-00000189")`.
-- **Posible duplicado:** A:J en amarillo (color 13431551) y un comentario en A.
+- **Posible duplicado:** A:J en amarillo (color 13431551) y un comentario en A. La I se pinta a propósito: solo cambia el relleno, nunca la fórmula ni el valor.
 - **Si la planilla tiene cambios sin guardar:** no escribe y las filas quedan pendientes. Se pueden reintentar o copiar al portapapeles.
 - **Antes de escribir:** hace un respaldo en `datos\backups\` (se guardan los últimos 20). Cada paso se anota en el diario antes de escribir; si algo falla a mitad, revierte y no guarda.
 
@@ -261,6 +262,7 @@ Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <
 
 - `lote_confirmado.json` se escribe **antes** de mover nada (el plan ya es final), y otra vez al terminar.
 - El diario, los estados de los lotes, las tandas, el historial de la memoria de proveedores y el registro del reset se guardan con `util.guardar_json`. Escribe un archivo temporal, lo baja al disco y recién después lo cambia por el anterior, así que un corte (app cerrada, PC apagada) nunca deja un registro a medio escribir.
+- Si la app se cortó mientras escribía en Excel (el diario tiene filas sin `excel_guardado` ni `excel_revertido`), Terminar este lote y Deshacer miran la planilla antes de seguir (`excel.reconocer_cortada`). Excel guarda todo o nada: si alguna fila sigue como la escribió la app, esa escritura se había guardado; Terminar no la repite y Deshacer la saca. Si la planilla tiene cambios sin guardar, espera a que la guardes o la cierres.
 - Cada movimiento de un PDF se anota en el diario **antes** de hacerlo (`moviendo`) y otra vez después (`mover`). Si la app se cortó entre las dos anotaciones y el archivo está en destino con el mismo SHA256, Terminar este lote y Deshacer lo dan por movido (`Diario.completar_cortados`): Deshacer lo devuelve, y Terminar no lo busca en `_Entrada`.
 - Si un archivo no se pudo mover (por ejemplo OneDrive lo tenía tomado), las filas de esa factura **no** se escriben, para que nunca haya un link a un archivo que sigue en `_Entrada`. En Resultado aparece cuántas quedaron y el botón **Reintentar archivos**.
 - **Terminar este lote / Reintentar** (`ejecutor.continuar`): hace solo los pasos de archivos que no están en el diario y después escribe solo las filas que todavía no se guardaron en la planilla. Se puede repetir sin duplicar nada. Sirve también para un lote que quedó a medias.

@@ -36,6 +36,34 @@ def _ocupado(e: Exception) -> bool:
     return bool(getattr(e, "args", None)) and e.args[0] == RPC_E_CALL_REJECTED
 
 
+def _pid_de(xl) -> int | None:
+    """Process id of a hidden Excel started with DispatchEx (from its window), or None."""
+    try:
+        import win32process
+        return win32process.GetWindowThreadProcessId(_reintentar_ocupado(lambda: xl.Hwnd, segundos=5))[1] or None
+    except Exception:
+        return None
+
+
+def _terminar_excel(pid: int) -> bool:
+    """Ends that process, only if it really is EXCEL.EXE (a reused pid is left alone)."""
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.OpenProcess.restype = wintypes.HANDLE
+    h = k32.OpenProcess(0x0001 | 0x1000, False, pid)        # PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    try:
+        buf, n = ctypes.create_unicode_buffer(1024), wintypes.DWORD(1024)
+        if not k32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)) or \
+                not buf.value.lower().endswith("\\excel.exe"):
+            return False
+        return bool(k32.TerminateProcess(h, 1))
+    finally:
+        k32.CloseHandle(h)
+
+
 def _reintentar_ocupado(fn, segundos: float = 20, pausa: float = 1):
     """`fn()`, retried while Excel answers 'call was rejected' (it does that for a while when it starts)."""
     import time
@@ -188,6 +216,7 @@ class LibroCOM:
         self.ruta = ruta
         self.xl = None
         self.nuevo = False
+        self.pid = None                    # process of the hidden Excel this app opened (never the user's)
         self._hojas: list = []
         self.wb = self._buscar_abierto(ruta, url_onedrive)
         self.ya_abierto = self.wb is not None
@@ -195,6 +224,7 @@ class LibroCOM:
             try:
                 self.xl = win32com.client.DispatchEx("Excel.Application")
                 self.nuevo = True
+                self.pid = _pid_de(self.xl)
                 self.xl.Visible = False
                 self.xl.DisplayAlerts = False
                 self.wb = _reintentar_ocupado(lambda: self.xl.Workbooks.Open(str(ruta), 0, False))
@@ -278,7 +308,9 @@ class LibroCOM:
             if self.xl is not None and self.nuevo:
                 self.xl.Quit()
         except Exception:
-            pass
+            # a hung hidden Excel would stay in the background and make the next ones reject every call
+            if self.nuevo and self.pid:
+                _terminar_excel(self.pid)
         self.wb = self.xl = None
 
 
@@ -533,7 +565,7 @@ def _escribir_todo(cfg, libro, filas, provs, hojas, ocupadas, anotar, log):
         for c, v in escrito.items():
             h.poner(r, c, v, texto=c in texto, formula=c in ("H", "J"))
         if f.resaltar:
-            for c in COLS:
+            for c in COLS:                        # I included on purpose: only its fill, never its formula (Matheo)
                 h.pintar(r, c, True)
         if f.comentario:
             h.comentar(r, "A", f.comentario)
@@ -608,6 +640,47 @@ def pasos_guardados(pasos: list[dict]) -> list[dict]:
         elif p["op"] == "excel_revertido":
             tanda = []
     return out
+
+
+def tanda_cortada(pasos: list[dict]) -> list[dict]:
+    """Excel steps of the last run with neither 'excel_guardado' nor 'excel_revertido' after them: the app
+    closed while writing, maybe right after Excel saved the workbook."""
+    tanda: list[dict] = []
+    for p in pasos:
+        if p["op"] in ("fila_excel", "proveedor_excel"):
+            tanda.append(p)
+        elif p["op"] in ("excel_guardado", "excel_revertido"):
+            tanda = []
+    return tanda
+
+
+def _sigue_como_la_dejo(libro, p: dict) -> bool:
+    if p["op"] == "fila_excel":
+        h = libro.hoja(p["hoja"])
+        return str(h.formula(p["fila"], "A")) == str(p["escrito"]["A"]) and (
+            "J" not in p["escrito"] or str(h.formula(p["fila"], "J")) == p["escrito"]["J"])
+    return str(libro.hoja("Proveedores").formula(p["fila"], "B")) == p["valores"][1]
+
+
+def reconocer_cortada(cfg, diario, log=print) -> bool | None:
+    """Decides a cut run by looking at the cells, so finishing the batch never writes its rows twice.
+    Excel saves all or nothing: if any row is still as the app wrote it, the run was saved. Returns True
+    (saved), False (not saved) or None (nothing cut). Raises LibroConCambios if the workbook has unsaved
+    changes (they may be the cut run itself, still in memory: the user saves or discards them first)."""
+    tanda = tanda_cortada(diario.pasos)
+    if not tanda:
+        return None
+    libro = abrir(cfg, Path(tanda[0]["libro"]))
+    try:
+        if not libro.saved:
+            raise LibroConCambios("la planilla está abierta con cambios sin guardar: guardala o cerrala sin "
+                                  "guardar y volvé a tocar Terminar este lote")
+        guardada = any(_sigue_como_la_dejo(libro, p) for p in tanda)
+    finally:
+        libro.cerrar()
+    diario.anotar({"op": "excel_guardado" if guardada else "excel_revertido", "recuperado": True})
+    log(f"EXCEL la escritura cortada {'se había guardado' if guardada else 'no se había guardado'}")
+    return guardada
 
 
 def deshacer_excel(cfg, pasos: list[dict], log=print) -> list[str]:

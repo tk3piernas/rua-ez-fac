@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from ..model import Extraccion, Item
 from ..pdf import DocPdf, Span
-from ..util import cbu_valido, cuit_valido, parse_fecha, parse_monto, solo_digitos
+from ..util import cbu_valido, cuit_valido, parse_fecha, parse_monto
 from .base import Parser, es_monto, tareas_en, tipo_de_codigo
 
 _MONTO_SOLO = re.compile(r"^-?\$?\s*-?\d[\d.,]*\d$")

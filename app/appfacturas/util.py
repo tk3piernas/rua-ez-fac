@@ -108,11 +108,6 @@ def cuit_valido(c: str | None) -> bool:
     return r == int(c[10])
 
 
-def fmt_cuit(c: str | None) -> str:
-    c = solo_digitos(c)
-    return f"{c[:2]}-{c[2:10]}-{c[10:]}" if len(c) == 11 else (c or "")
-
-
 def cbu_valido(c: str | None) -> bool:
     c = solo_digitos(c)
     if len(c) != 22:

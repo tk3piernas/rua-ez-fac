@@ -1,6 +1,6 @@
 # RUA EZ-Fac: instrucciones para Claude Code
 
-App de escritorio (Python 3.15 + NiceGUI) que carga las facturas de proveedores de RUA Asistencia (áreas Vehicular y Hogar) en `DEUDA A PAGAR ARG.xlsx`. Reemplaza al script `OrdenarFacturas.ps1`. Detalle técnico: `docs/DOCUMENTACION.md`. Guía de uso: `docs/Guia de uso RUA EZ-Fac.pdf`.
+App de escritorio (Python 3.15 + NiceGUI) que carga las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa) en `DEUDA A PAGAR ARG.xlsx`. Reemplazó al script `OrdenarFacturas.ps1` (retirado). Detalle técnico: `docs/DOCUMENTACION.md`. Guía de uso: `docs/Guia de uso RUA EZ-Fac.pdf`.
 
 ## Con quién hablás
 
@@ -13,7 +13,8 @@ App de escritorio (Python 3.15 + NiceGUI) que carga las facturas de proveedores 
 `github.com/tk3piernas/rua-ez-fac` es público. Antes de cada commit revisá `git status` y `git diff --cached --stat`. Nunca commitees:
 
 - Facturas, PDFs o zips de proveedores, ni CUIT, CBU, CVU, alias o números de cuenta reales (en tests usá números inventados con dígito verificador válido).
-- `app/tests_privados/` (tests con facturas reales y sus fixtures), `datos/`, `prueba/`, `config.toml`, `.venv/`, `paridad/` y cualquier `.ps1`.
+- `app/tests_privados/` (tests con facturas reales y sus fixtures), `datos/`, `prueba/`, `config.toml`, `.venv/`, `paridad/` y cualquier `.ps1` (salvo `instalar.ps1`, que se publica a propósito para instalar con una línea).
+- `docs/historial/revision-2026-10-28.md` (tiene nombres reales de proveedores).
 - Rutas o URLs personales nuevas (por ejemplo la URL de SharePoint de Matheo) dentro del código.
 
 Todo eso ya está en `.gitignore`. Si algo privado aparece como "untracked", agregalo a `.gitignore` en vez de commitearlo. Si ves que ya se subió algo privado, frená y avisale a Matheo.
@@ -36,7 +37,13 @@ Desde la carpeta de la app (usa el Python del `.venv`):
 .venv\Scripts\python.exe -m pytest -q app\tests_privados
 ```
 
-Se corren por separado porque cada carpeta tiene su `conftest.py`. Las dos tienen que pasar antes de commitear. Para ver la app: `.venv\Scripts\python.exe -m appfacturas ui` (si ya hay una abierta de otra versión, la cierra sola).
+Se corren por separado porque cada carpeta tiene su `conftest.py`. Las dos tienen que pasar antes de commitear. Si el cambio toca `excel.py`, `ejecutor.py`, `preparar.py` o `borrado.py`, corré también las pruebas con Excel de verdad (abren Excel sobre copias temporales; un "Windows fatal exception" al cerrar es ruido de COM):
+
+```
+.venv\Scripts\python.exe -m pytest -q -m excel app\tests_privados
+```
+
+Para ver la app: `.venv\Scripts\python.exe -m appfacturas ui` (si ya hay una abierta de otra versión, la cierra sola).
 
 ## Después de cada cambio
 
@@ -48,5 +55,5 @@ Se corren por separado porque cada carpeta tiene su `conftest.py`. Las dos tiene
 
 ## Pendiente
 
-- Probar el reset de la planilla con Excel real, primero en la carpeta de prueba.
+- Probar el reset de la planilla con Excel real en la carpeta de prueba (con Excel de verdad sobre una copia temporal ya anda: `test_reset_excel.py`).
 - Primera corrida real (Matheo elige "Cargar en la planilla real").

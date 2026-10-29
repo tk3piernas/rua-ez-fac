@@ -45,12 +45,6 @@ def marcar(hwnd: int) -> None:
     store.Commit()
 
 
-def id_de(hwnd: int) -> str:
-    from win32comext.propsys import propsys, pscon
-    store = propsys.SHGetPropertyStoreForWindow(hwnd, propsys.IID_IPropertyStore)
-    return store.GetValue(pscon.PKEY_AppUserModel_ID).GetValue() or ""
-
-
 def ventanas() -> list[int]:
     """Visible top-level windows titled like the app (the Edge app window is titled with the page title)."""
     import win32gui

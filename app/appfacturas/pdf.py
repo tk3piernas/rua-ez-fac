@@ -86,12 +86,6 @@ def leer(ruta: Path) -> DocPdf:
         doc.close()
 
 
-def imagen_pagina(ruta: Path, pagina: int = 0, dpi: int = 150) -> bytes:
-    """PNG of one page (for scanned invoices sent to Claude)."""
-    with pymupdf.open(ruta) as doc:
-        return doc[pagina].get_pixmap(dpi=dpi).tobytes("png")
-
-
 def expandir_zip(zip_path: Path, destino: Path) -> list[Path]:
     """Extract the PDFs of a zip (recursively, safely) and return them sorted."""
     destino.mkdir(parents=True, exist_ok=True)

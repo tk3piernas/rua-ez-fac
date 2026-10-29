@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from appfacturas import carpeta_prueba as paridad, ejecutor, reporte  # noqa: E402
+from appfacturas import carpeta_prueba, ejecutor, reporte  # noqa: E402
 from appfacturas.config import AREAS, carpeta_app, cargar  # noqa: E402
 from appfacturas.lote import Armador, entradas_de_carpeta  # noqa: E402
 from appfacturas.util import ahora_id, sha256  # noqa: E402
@@ -35,7 +35,7 @@ def correr_lote(cfg, simular: bool, log=print):
 def prueba_mover(salida: Path) -> bool:
     L = []
     w = lambda s="": (L.append(s), print(s))
-    base = paridad.preparar()
+    base = carpeta_prueba.preparar()
     raiz = base.parent
     f0 = foto(raiz)
     cfg = cargar(base=base)
@@ -141,7 +141,7 @@ def prueba_excel(salida: Path) -> bool:
     todo_ok = True
     for modo in ("cerrada", "abierta"):
         w(f"===== Planilla {modo} =====")
-        base = paridad.preparar()
+        base = carpeta_prueba.preparar()
         libro = base.parent / "DEUDA A PAGAR ARG.xlsx"
         if not libro.exists():
             w("  ! No hay copia de la planilla en la carpeta de prueba")

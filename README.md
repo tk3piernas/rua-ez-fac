@@ -113,9 +113,9 @@ Simular (CLI).bat                      simula _Entrada sin interfaz y deja un in
 requirements*.txt                      librerías con versión fija (ver docs para el --no-deps)
 app/appfacturas/                       código (Python + NiceGUI)
 app/tests/                             pruebas que corren sin facturas reales
-app/herramientas/                      pruebas automáticas sobre la carpeta de prueba y la paridad con el script viejo (retirado)
+app/herramientas/                      pruebas automáticas sobre la carpeta de prueba
 CLAUDE.md                              reglas para Claude Code (qué nunca se sube, cómo probar y publicar)
-docs/                                  guía de uso (PDF y su HTML en docs/guia), documentación técnica y prompt de revisión
+docs/                                  guía de uso (PDF y su HTML en docs/guia), documentación técnica, auditoría y prompts viejos (docs/historial)
 ```
 
 Lo que crea cada instalación queda fuera del repo: `.venv\`, `datos\` (lotes, informes, respaldos), `prueba\` y `config.toml`.

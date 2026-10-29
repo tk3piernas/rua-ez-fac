@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.19.5 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión 0.19.6 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -283,7 +283,7 @@ Deja la app como recién empezada. **Nunca borra: mueve** a carpetas `_Borrado <
 
 Ninguno mueve archivos ni escribe en la planilla. `procesar`, `deshacer` y `excel-pendiente` se sacaron en la 0.19.4: no miraban el modo de trabajo y podían tocar lo real en "Solo simular". Todo eso se hace desde la app.
 
-Herramientas aparte (fuera del paquete, en `app\herramientas\`): `prueba.py mover|excel` (pruebas automáticas sobre la carpeta de prueba) y `paridad.py preparar|comparar` (la comparación contra el script viejo, ya retirado; necesita el PS1, que no está en el repo).
+Herramienta aparte (fuera del paquete, en `app\herramientas\`): `prueba.py mover|excel` (pruebas automáticas sobre la carpeta de prueba). La herramienta de paridad contra el script viejo y el `paridad.csv` de cada lote se retiraron en la 0.19.6.
 
 ## Pruebas
 

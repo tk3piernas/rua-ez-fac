@@ -6,6 +6,7 @@ Solo lectura: no se cambió código ni se tocó nada real. Se corrieron las dos 
 - El lote 1 (A1, A2, A4, M1 y el test de la CLI) quedó hecho en la 0.19.4.
 - El lote 2 (A3 y M2) quedó hecho en la 0.19.5.
 - M3: Matheo decidió que la I se siga pintando; quedó anotado en CLAUDE.md.
+- El lote 3 (L1, L2, L4, T2, T3, Doc1 y Doc2) quedó hecho en la 0.19.6. Los prompts viejos están en `docs/historial/`.
 
 Esfuerzo: **chico** = menos de una hora con test; **mediano** = media jornada; **grande** = varios días.
 

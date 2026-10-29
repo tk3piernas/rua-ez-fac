@@ -9,10 +9,8 @@ against a small adapter. Two adapters exist:
 """
 from __future__ import annotations
 
-import re
 import shutil
 from datetime import date, datetime
-from decimal import Decimal
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -83,10 +81,6 @@ class LibroConCambios(ExcelError):
 
 def serial(d: date) -> float:
     return float((d - date(1899, 12, 30)).days)
-
-
-def _col(c: str) -> int:
-    return ord(c) - 64
 
 
 # ======================================================================= adapters
@@ -502,14 +496,12 @@ def escribir(cfg, lote, diario, backups: Path, guardar_cambios_usuario: bool = F
         hojas = {}
         ocupadas: dict[str, set] = {}
         hechos: list[dict] = []
-        anotar = diario.anotar
 
-        def anotar_y_guardar(paso):
+        def anotar(paso):
             hechos.append(paso)
-            anotar(paso)
-        diario_anotar = anotar_y_guardar
+            diario.anotar(paso)
         try:
-            n, np = _escribir_todo(cfg, libro, filas, provs, hojas, ocupadas, diario_anotar, log)
+            n, np = _escribir_todo(cfg, libro, filas, provs, hojas, ocupadas, anotar, log)
         except Exception:
             # nothing half-written stays in the workbook: undo this run in memory and do not save
             _revertir(libro, hechos)
@@ -519,7 +511,7 @@ def escribir(cfg, lote, diario, backups: Path, guardar_cambios_usuario: bool = F
                     libro.marcar_guardado()
                 except Exception:
                     pass
-            anotar({"op": "excel_revertido"})
+            diario.anotar({"op": "excel_revertido"})
             raise
         libro.guardar()
         diario.anotar({"op": "excel_guardado"})

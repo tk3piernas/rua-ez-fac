@@ -1,7 +1,6 @@
 """Plain-text report of a batch (same information as the PS1 -Simular output) + parity CSV."""
 from __future__ import annotations
 
-import csv
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -92,25 +91,9 @@ def _rel(p: Path, base) -> str:
     return relativa(p, base)
 
 
-def paridad_csv(lote: Lote, ruta: Path) -> None:
-    """One line per invoice, the fields compared against the PS1."""
-    with open(ruta, "w", newline="", encoding="utf-8-sig") as fh:
-        w = csv.writer(fh, delimiter=";")
-        w.writerow(["archivo", "clave", "proveedor", "destino", "desde", "vto", "monto", "iva", "tareas", "estado", "dup", "posibles"])
-        for f in lote.facturas:
-            e = f.ext
-            tareas = " / ".join(dict.fromkeys(t for i in (e.items if e else []) for t in i.tareas))
-            w.writerow([f.archivo.nombre, f.clave, f.proveedor,
-                        _rel(f.destino or f.existente, None) if (f.destino or f.existente) else "",
-                        fmt_fecha(e.desde or e.emision) if e else "", fmt_fecha(e.vto) if e else "",
-                        f.monto if f.monto is not None else "", "" if f.iva is None else f.iva,
-                        tareas, f.estado.value, f.dup, " | ".join(f.posibles)])
-
-
 def guardar(lote: Lote, carpeta: Path, informe: str) -> Path:
     d = carpeta / lote.id
     d.mkdir(parents=True, exist_ok=True)
     (d / "informe.txt").write_text(informe, encoding="utf-8")
     (d / "lote.json").write_text(json.dumps(lote, default=a_json, ensure_ascii=False, indent=1), encoding="utf-8")
-    paridad_csv(lote, d / "paridad.csv")
     return d

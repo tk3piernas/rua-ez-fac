@@ -632,10 +632,6 @@ def _iva_h(letra: str, monto, iva, alic: Decimal, tol: float):
     return iva if abs(iva - formula) > Decimal(str(tol)) else None
 
 
-def _nombre_sugerido(razon: str) -> str:
-    return re.sub(r"\s+", " ", razon or "").strip()
-
-
 _TAREA_TXT = re.compile(r"(?i)\(?\s*(?:n\s*[°º.]*\s*de\s*tarea|tarea|exp(?:ediente)?\.?|servicio)\s*(?:n\s*[°º.*]*\s*)?:?\s*\d{6}\s*\)?")
 
 

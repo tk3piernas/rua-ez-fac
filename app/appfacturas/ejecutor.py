@@ -14,11 +14,9 @@ from datetime import datetime
 from pathlib import Path
 
 from .model import Lote
+from .util import guardar_json, relativa, ruta_libre, sha256, url_sharepoint
 
 HIST_MEMORIA = "memoria_proveedores.json"
-
-
-from .util import guardar_json, relativa, ruta_libre, sha256, url_sharepoint
 
 
 class YaDeshecho(Exception):
@@ -298,10 +296,7 @@ def escribir_excel(cfg, lote, diario, carpeta_lote: Path, guardar_cambios_usuari
         res = excel.escribir(cfg, lote, diario, carpeta_lote.parent.parent / "backups",
                              guardar_cambios_usuario=guardar_cambios_usuario, log=log)
         return "escrito", "", res
-    except excel.LibroConCambios as e:
-        log(f"EXCEL pendiente: {e}")
-        return "pendiente", str(e), {"filas": 0, "proveedores": 0}
-    except Exception as e:
+    except Exception as e:                   # unsaved changes, Excel busy...: the rows wait for a retry
         log(f"EXCEL pendiente: {e}")
         return "pendiente", str(e), {"filas": 0, "proveedores": 0}
 

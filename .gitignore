@@ -44,3 +44,6 @@ __pycache__/
 /*.pdf
 app/**/*.pdf
 app/**/*.txt
+
+# old review with real provider names: local only
+/docs/historial/revision-2026-10-28.md

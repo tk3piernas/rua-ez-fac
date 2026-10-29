@@ -55,6 +55,10 @@ La primera vez que la abrís, un **recorrido** te muestra cada parte de la app y
 
 > **¡Esto es una beta!** Mandá bugs y sugerencias a Matheo.
 
+## Modo oscuro
+
+**Configuración → Ventana y colores → Colores de la app:** Claro, Oscuro o Como Windows. Se aplica en el momento y queda guardado.
+
 ## Datos de proveedores
 
 Pestaña **Proveedores**: pegá los datos como vengan (mail, WhatsApp, .txt) y tocá *Leer los datos*. La app saca CUIT, CBU/CVU, alias, banco y contacto, chequea el CUIT y el CBU y te muestra la ficha para corregir antes de guardar. Se guardan en `PROVEEDORES RUA.xlsx` (OneDrive, al lado de la planilla), que no se toca con las actualizaciones. Cuando un lote trae un proveedor que no está en la hoja Proveedores de la planilla, la app copia sus datos desde ahí; y los datos que llegan en .txt con un lote se guardan solos. Cada cambio se puede deshacer.

@@ -6,6 +6,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+TEMAS = ("claro", "oscuro", "sistema")         # app colours; "sistema" follows Windows
 # invoice areas: one input folder, one provider folder and one workbook sheet each
 AREAS = ("Vehicular", "Hogar", "Persona", "ServiciosYa")
 
@@ -51,6 +52,8 @@ empresa_hogar = ""
 puerto = 8765
 # false = tocar el ícono con la app abierta trae al frente la ventana que ya está (no abre otra)
 varias_ventanas = false
+# Colores de la app: "claro", "oscuro" o "sistema" (igual que Windows)
+tema = "claro"
 # false = la app solo simula sobre las carpetas y la planilla reales (las escrituras van a la carpeta de prueba).
 # Lo cambia Matheo desde Configuración cuando aprueba usar la planilla real.
 modo_real = false
@@ -73,6 +76,7 @@ class Config:
     escribir_servicio: bool = False
     puerto: int = 8765
     varias_ventanas: bool = False        # clicking the icon with the app open opens another window
+    tema: str = "claro"                  # claro / oscuro / sistema (follows Windows)
     modo_real: bool = False
     excel_motor: str = "com"          # "openpyxl" only in tests (there is no Excel in the cloud)
     archivo: Path | None = None
@@ -164,6 +168,7 @@ def cargar(ruta: Path | None = None, base: Path | None = None) -> Config:
     c.escribir_servicio = bool(pl.get("escribir_servicio", False))
     c.puerto = int(ap.get("puerto", c.puerto))
     c.varias_ventanas = bool(ap.get("varias_ventanas", False))
+    c.tema = ap.get("tema") if ap.get("tema") in TEMAS else "claro"
     c.modo_real = bool(ap.get("modo_real", False))
     return c
 

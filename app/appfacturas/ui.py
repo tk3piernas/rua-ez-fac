@@ -65,7 +65,41 @@ body { background: linear-gradient(180deg, #e9ebf7 0px, #f6f7fc 320px) fixed; co
 /* paths: wrap at spaces (or anywhere only if one piece is too long), never 'DEU / DA' */
 .ruta { overflow-wrap: anywhere; word-break: normal; }
 .chequeo-ok { color: #15803d; } .chequeo-falta { color: #dc2626; } .chequeo-aviso { color: #d97706; }
+/* dark theme (Configuración → Ventana → Tema): Quasar puts .body--dark on the body */
+body.body--dark { background: linear-gradient(180deg, #0b0c1c 0px, #12132a 320px) fixed; color: #e4e6f2;
+                  --linea: #2c2e4a; }
+.body--dark .seccion, .body--dark .dialogo-botones, .body--dark .q-uploader { background: #181a30; }
+.body--dark .seccion { box-shadow: 0 8px 28px rgba(0,0,0,.35) !important; }
+.body--dark .tarjeta { background: linear-gradient(180deg, #1c1e36, #16182c); }
+.body--dark .titulo-seccion, .body--dark .tarjeta .valor, .body--dark .q-tab--active { color: #b3b4ff !important; }
+.body--dark .tarjeta .titulo, .body--dark .q-tab { color: #a3a8c3; }
+.body--dark .zona-peligro { background: #2a1416; border-color: #ef4444; }
+.body--dark .zona-peligro .titulo-seccion { color: #fca5a5 !important; }
+.body--dark .pill-prueba { background: #14532d; color: #bbf7d0; }
+.body--dark .pill-real { background: #5a1d0e; color: #ffd2c4; }
+.body--dark .pill-sim { background: #5a3c08; color: #fde68a; }
+.body--dark .ag-theme-balham { --ag-background-color: #181a30; --ag-foreground-color: #e4e6f2;
+    --ag-header-background-color: #22243e; --ag-header-foreground-color: #b3b4ff; --ag-odd-row-background-color: #1c1e36;
+    --ag-border-color: #2c2e4a; --ag-row-border-color: #2c2e4a; --ag-row-hover-color: #25284a;
+    --ag-selected-row-background-color: #2d3060; --ag-secondary-foreground-color: #a3a8c3;
+    --ag-control-panel-background-color: #22243e; --ag-input-focus-border-color: #6b6cff; }
+.body--dark .fila-amarilla { background-color: #4a3f12 !important; }
+.body--dark .fila-roja { background-color: #4c1d1d !important; }
+.body--dark .fila-violeta { background-color: #35265a !important; }
+.body--dark .fila-excluida { color: #6b7080 !important; }
+.body--dark .text-gray-500, .body--dark .text-gray-600 { color: #9aa0bd !important; }
+.body--dark .text-gray-700 { color: #c3c7dc !important; }
+.body--dark .text-amber-700 { color: #fbbf24 !important; }
+.body--dark .text-red-700 { color: #fca5a5 !important; }
+.body--dark .bg-amber-50 { background: #3a300f !important; }
+.body--dark .bg-red-50 { background: #3a1618 !important; }
+.body--dark .bg-indigo-50 { background: #1f2147 !important; }
+.body--dark .text-primary, .body--dark .q-field--focused .q-field__label { color: #b3b4ff !important; }
+.body--dark .chequeo-ok { color: #4ade80; } .body--dark .chequeo-falta { color: #f87171; }
+.body--dark .chequeo-aviso { color: #fbbf24; }
 """
+TEMAS = {"claro": False, "oscuro": True, "sistema": None}      # None: follows Windows
+_oscuro: dict = {}                                             # client id -> its ui.dark_mode
 
 
 def seccion(titulo: str, icono: str | None = None, ancho: str = "w-full", simbolo: str = ""):
@@ -389,6 +423,7 @@ def pagina():
     ui.add_css(CSS)
     ui.colors(primary="#14147a", secondary="#ff542c", accent="#ff542c", positive="#15803d",
               negative="#dc2626", warning="#d97706", info="#2b2aa8")
+    _oscuro[ui.context.client.id] = ui.dark_mode(TEMAS.get(config.cargar().tema, False))
     from . import recorrido
     # the file's date in the URL: after an update the browser never keeps the old script
     ui.add_head_html(f'<script src="/ezfac/recorrido.js?v={int((STATIC / "recorrido.js").stat().st_mtime)}"></script>')
@@ -547,7 +582,7 @@ def panel_cargar(tabs, t_rev, refrescar_modo):
                                         + [("Subidos acá", c.get("subidos", 0))]):
                         with ui.row().classes("gap-2 items-baseline"):
                             ui.label(etiqueta).classes("text-sm text-gray-600")
-                            ui.label(str(n)).classes("text-xl font-bold").style("color: var(--navy)")
+                            ui.label(str(n)).classes("text-xl font-bold text-primary")
                     subidos = lista_subidos()
                     viejos = [f for f in subidos if f.stat().st_mtime < INICIO]
                     if viejos:
@@ -1613,7 +1648,7 @@ def panel_config(refrescar_modo):
                     "color=negative outline")
                 volver_reset_boton()
 
-        with seccion("Ventana", "web_asset", "w-[760px]"):
+        with seccion("Ventana y colores", "web_asset", "w-[760px]"):
             def cambiar_ventanas(e):
                 config.guardar_opcion(cfg_real.archivo, "app", "varias_ventanas", bool(e.value))
                 ui.notify("Listo: " + ("cada clic en el ícono abre otra ventana" if e.value else
@@ -1622,6 +1657,14 @@ def panel_config(refrescar_modo):
                       on_change=cambiar_ventanas)
             ui.label("Apagado: si la app ya está abierta, tocar el ícono trae al frente esa ventana en vez de abrir "
                      "otra.").classes("text-xs text-gray-500 text-center")
+
+            def cambiar_tema(e):
+                config.guardar_opcion(cfg_real.archivo, "app", "tema", e.value)
+                d = _oscuro.get(ui.context.client.id)
+                if d is not None:
+                    d.set_value(TEMAS[e.value])
+            ui.select({"claro": "Claro", "oscuro": "Oscuro", "sistema": "Como Windows"}, value=cfg_real.tema,
+                      label="Colores de la app", on_change=cambiar_tema).classes("w-60")
 
         panel_clave_claude()
 

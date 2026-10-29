@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión b0.20.0 (beta, 28/10/2026). Desde la beta, las versiones se numeran `b0.x.y`. La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión b0.21.0 (beta, 28/10/2026). Desde la beta, las versiones se numeran `b0.x.y`. La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -81,7 +81,10 @@ Estructura de la carpeta de la app:
   - **Exportar planilla**: guarda una copia con el nombre que elijas (por defecto `DEUDA A PAGAR ARG dd-mm-aaaa`) en la carpeta `Planillas exportadas`, al lado de la planilla. Usa `SaveCopyAs` de Excel, así que si está abierta incluye lo que tenga sin guardar; la planilla no cambia. Nunca pisa una exportada con el mismo nombre. Después de exportar se puede abrir la copia o deshacer (la borra si nadie la tocó). Para empezar de cero después, Reset.
 - Deshacer un lote que ya estaba deshecho no hace nada (antes, un segundo clic informaba como "cambió después" todo lo que ya había vuelto).
 - **Barra de tareas:** la ventana es Edge en modo app, pero apenas se abre la app le pone la identidad `RUA.EZFac` (AppUserModelID), con su ícono, su nombre y el comando para volver a abrirla (`ventana.py`). Los accesos directos llevan la misma identidad. Así la ventana se agrupa con el ícono de RUA EZ-Fac y no con Edge, y *Anclar a la barra de tareas* (clic derecho en el ícono de la barra, o en el acceso directo) deja el ícono de la app y abre la app.
-- **Una sola ventana:** con la app abierta, tocar el ícono trae al frente la ventana que ya está, en vez de abrir otra. Varios clics rápidos mientras arranca no levantan varias copias: el primero arranca la app (con un candado de Windows, `Local\RUA.EZFac.inicio.<puerto>`, uno por puerto) y los demás esperan y muestran su ventana. Configuración → *Ventana* → "Permitir abrir más de una ventana de la app" (`[app] varias_ventanas`, apagado por defecto) vuelve a abrir una ventana por clic.
+- **Una sola ventana:** con la app abierta, tocar el ícono trae al frente la ventana que ya está, en vez de abrir otra. Varios clics rápidos mientras arranca no levantan varias copias: el primero arranca la app (con un candado de Windows, `Local\RUA.EZFac.inicio.<puerto>`, uno por puerto) y los demás esperan y muestran su ventana. Configuración → *Ventana y colores* → "Permitir abrir más de una ventana de la app" (`[app] varias_ventanas`, apagado por defecto) vuelve a abrir una ventana por clic.
+- **Modo oscuro:** Configuración → *Ventana y colores* → "Colores de la app": Claro (por defecto), Oscuro o Como Windows (`[app] tema` = `claro` / `oscuro` / `sistema`).
+  - Se aplica en el momento, sin reiniciar. Usa el modo oscuro de Quasar (`ui.dark_mode`, que pone `body--dark`); el CSS de `ui.py` tiene la versión oscura de cada color fijo: tarjetas, tablas, filas amarillas, rojas y violetas, recuadros de aviso, Zona de peligro, pastillas de modo y textos grises.
+  - Un color nuevo escrito a mano (`.style("color: ...")` o una clase de Tailwind sin versión oscura) se ve mal en modo oscuro: usá las clases del CSS o `text-primary`.
 - El botón Salir, en la punta derecha del encabezado (al lado del modo de trabajo), cierra la ventana de la app (si el navegador no la deja cerrarse, muestra "RUA EZ-Fac se cerró") y apaga el servidor; lo fuerza a los 1,5 segundos si algo lo retiene.
 
 ## Pantallas

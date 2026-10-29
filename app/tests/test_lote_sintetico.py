@@ -188,3 +188,25 @@ def test_factura_b(sandbox):
     assert (r.monto, r.iva) == (D("121000.00"), D("0"))
     assert not r.excluida
     assert any(a.codigo == "factura_b" for a in lote.avisos)
+
+
+def test_contacto_del_emisor_y_nunca_el_de_rua():
+    from appfacturas.parsers.base import contacto_emisor
+    texto = ("GRUAS INVENTADAS  Tel: (011) 4555-1234  Cel. +54 9 11 5555-0000  ventas@gruasinventadas.com.ar\n"
+             f"CUIT: {_fmt(CUIT)}  CAE: 76123456789012\n"
+             "Cliente: RUA ASISTENCIA S.A.  CUIT: 30-71741942-8  Tel: 011 4000-9999  pagos@rua-asistencia.com.ar")
+    tel, mail = contacto_emisor(texto, "30717419428")
+    assert tel == "01145551234 / +5491155550000" and mail == "ventas@gruasinventadas.com.ar"
+    assert contacto_emisor("CUIT 20-11111111-2  CAE 76123456789012  Total 121.000,00", "30717419428") == ("", "")
+    assert contacto_emisor("Mail: facturacion@rua-asistencia.com  arca@afip.gob.ar", "30717419428") == ("", "")
+
+
+def test_la_ficha_toma_telefono_y_email_de_la_factura(sandbox):
+    """A new provider: its record (for the Proveedores sheet and the memory) gets the invoice's phone and email,
+    only to fill empty fields."""
+    factura(sandbox.entrada / "Vehicular" / "c.pdf", 91, cabecera="Tel: 011 4555-1234   ventas@gruasinventadas.com.ar")
+    lote = armar(sandbox)
+    e = lote.facturas[0].ext
+    assert (e.telefono, e.email) == ("01145551234", "ventas@gruasinventadas.com.ar")
+    (p,) = [p for p in lote.proveedores if p["valores"][2] == CUIT]
+    assert p["valores"][6:8] == ["01145551234", "ventas@gruasinventadas.com.ar"] and p["solo_vacios"]

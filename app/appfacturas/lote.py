@@ -132,6 +132,9 @@ class Armador:
         if parser:
             try:
                 e = parser.extraer(doc, ruta.name, self.cfg)
+                if not (e.telefono or e.email):
+                    from .parsers.base import contacto_emisor
+                    e.telefono, e.email = contacto_emisor(doc.texto, self.cfg.cuit_rua)
             except Exception as ex:   # a broken parser must not stop the batch
                 self.lote.aviso(Nivel.REVISAR, "parser_error", f"{nombre}: error leyendo ({ex})", f.id)
         f.ext = e
@@ -519,7 +522,8 @@ class Armador:
             if e and e.razon_social and norm(e.razon_social) != norm(nombre):
                 obs.append(f"Razón social: {nombre_prolijo(e.razon_social, self.cfg.siglas)}")
             vals = [area, nombre, cuit, d.condicion_iva or (e.condicion_emisor if e else ""),
-                    d.domicilio or (e.domicilio if e else ""), d.contacto, d.telefono, d.email,
+                    d.domicilio or (e.domicilio if e else ""), d.contacto, d.telefono or (e.telefono if e else ""),
+                    d.email or (e.email if e else ""),
                     c0.banco if c0 else "", c0.tipo if c0 else "", c0.nro if c0 else "", c0.cbu if c0 else "",
                     c0.alias if c0 else "", (c0.titular if c0 else "") or d.titular or d.contacto, ". ".join(obs)]
             filas[prov.clave if prov else f"txt:{d.archivo.name}"] = {"origen": d.archivo.name, "valores": vals}
@@ -547,11 +551,14 @@ class Armador:
                 obs.append("Sin CUIT (comprobante no fiscal)")
             if e.cbu:
                 obs.append("Banco deducido del CBU")
-            vals = [p.area, p.nombre, p.cuit, e.condicion_emisor, e.domicilio, "", "", "",
+            if e.telefono or e.email:
+                obs.append("Teléfono / email tomados de la factura")
+            vals = [p.area, p.nombre, p.cuit, e.condicion_emisor, e.domicilio, "", e.telefono, e.email,
                     banco_de(e.cbu) if e.cbu else "", "", "", e.cbu, "", "", ". ".join(obs)]
             filas[p.clave] = {"origen": fs[0].texto_link, "valores": vals, "solo_vacios": True}
             if not e.cbu:
-                self.lote.aviso(Nivel.INFO, "sin_datos", f"{p.nombre}: no tengo sus datos bancarios ni de contacto; "
+                falta = "sus datos bancarios" + ("" if e.telefono or e.email else " ni de contacto")
+                self.lote.aviso(Nivel.INFO, "sin_datos", f"{p.nombre}: no tengo {falta}; "
                                 "pegalos en la pestaña Proveedores y la app los recuerda")
         self.lote.proveedores = [{"clave": k, **v} for k, v in filas.items()]
 

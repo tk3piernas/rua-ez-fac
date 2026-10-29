@@ -67,6 +67,8 @@ class Extraccion:
     razon_social: str = ""
     nombre_fantasia: str = ""
     domicilio: str = ""
+    telefono: str = ""               # the issuer's, only from its part of the invoice (parsers.base.contacto_emisor)
+    email: str = ""
     condicion_emisor: str = ""
     condicion_receptor: str = ""
     cuit_receptor: str = ""

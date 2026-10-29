@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión b0.21.0 (beta, 28/10/2026). Desde la beta, las versiones se numeran `b0.x.y`. La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión b0.22.0 (beta, 28/10/2026). Desde la beta, las versiones se numeran `b0.x.y`. La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -120,6 +120,12 @@ Estructura de la carpeta de la app:
    Botón **Copiar informe** para pegarlo en un mail o chat.
 5. **Proveedores** (`maestro.py`): memoria de datos de proveedores en `PROVEEDORES RUA.xlsx`.
    - Lista de la memoria con Área, Proveedor, CUIT, Banco, CBU, Alias, Contacto, **Teléfono** y **Email** (columnas G y H de la hoja Proveedores; ya existían, la planilla no cambió). Clic en un teléfono: lo copia. Clic en un email: abre un mail nuevo. Varios teléfonos o mails van en la misma celda separados por " / ".
+   - **Teléfono y email de las facturas** (`parsers/base.contacto_emisor`): al leer un PDF se buscan el teléfono y el mail del emisor.
+     - Solo en el texto que está antes del CUIT de RUA (lo que viene después es RUA como cliente).
+     - Solo teléfonos con etiqueta ("Tel", "Cel", "WhatsApp", "Móvil"), de 8 a 13 cifras, para no confundir un CUIT, un CAE o un importe.
+     - Nunca mails de RUA (`rua-asistencia`) ni de ARCA o AFIP. Como mucho dos de cada uno, separados por " / ".
+     - Se usan en la ficha de un proveedor nuevo y para completar la de un .txt que no los trae, siempre solo para llenar campos vacíos: nunca pisan lo que ya está en la memoria.
+     - En las facturas de prueba (9 reales) apareció un mail en 1 y ningún teléfono: la fuente principal sigue siendo el .txt o el texto pegado.
    - Cuadro para pegar texto (mail, WhatsApp, .txt): lo lee el mismo lector de los .txt y arma una ficha editable con chequeos (dígito verificador de CUIT y CBU, banco del CBU). Si el proveedor ya está, muestra qué cambia.
    - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita el modo "Cargar en la planilla real" o "Practicar en la carpeta de prueba".
    - Al leer un lote, los proveedores que no están en la hoja Proveedores de la planilla toman sus datos de la memoria. Al confirmar, los datos de los .txt (y lo que se sacó de las facturas, solo para completar vacíos) se guardan en la memoria; deshacer el lote los vuelve atrás.

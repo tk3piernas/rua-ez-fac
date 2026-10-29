@@ -55,6 +55,34 @@ def nombre_afip(nombre_archivo: str):
     return m.group(1), int(m.group(2)), int(m.group(3)), int(m.group(4))
 
 
+# ------------------------------------------------------------- issuer's phone and email
+
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_NO_EMISOR = ("rua-asistencia", "ruaasistencia", "afip.gob", "arca.gob")     # RUA's own and the tax agency's
+_TEL_RE = re.compile(r"(?i)\b(?:tel[eé]fonos?|tel|cel(?:ular)?|whats\s*app|wsp|m[oó]vil)\b\.?\s*:?\s*"
+                     r"(\+?[\d(][\d\s()./-]{6,22}\d)")
+
+
+def contacto_emisor(texto: str, cuit_rua: str) -> tuple[str, str]:
+    """(phone, email) of whoever issued the invoice, or "" each. Only the text before RUA's CUIT is used (the
+    issuer's block; RUA's own details come after it as the client), only phones with a label ('Tel', 'Cel',
+    'WhatsApp'...) so a CUIT, CAE or amount is never taken, and never an email of RUA or of ARCA."""
+    texto = texto or ""
+    d = re.sub(r"\D", "", cuit_rua or "")
+    if len(d) == 11:
+        m = re.search(rf"{d[:2]}\D?{d[2:10]}\D?{d[10]}", texto)
+        if m:
+            texto = texto[:m.start()]
+    mails = [m for m in dict.fromkeys(x.strip(".").lower() for x in _EMAIL_RE.findall(texto))
+             if not any(n in m for n in _NO_EMISOR)]
+    tels = []
+    for m in _TEL_RE.finditer(texto):
+        digitos = re.sub(r"\D", "", m.group(1))
+        if 8 <= len(digitos) <= 13 and digitos not in tels:
+            tels.append(("+" if m.group(1).startswith("+") else "") + digitos)
+    return " / ".join(tels[:2]), " / ".join(mails[:2])
+
+
 # ------------------------------------------------------------- task numbers
 
 def tareas_en(texto: str, tmin: int, tmax: int) -> list[str]:

@@ -55,6 +55,8 @@ La primera vez que la abrís, un **recorrido** te muestra cada parte de la app y
 
 > **¡Esto es una beta!** Mandá bugs y sugerencias a Matheo.
 
+Al leer las facturas, la app también toma el teléfono y el email del proveedor si vienen impresos. Solo completa lo que falta en su ficha y nunca toma los de RUA.
+
 ## Modo oscuro
 
 **Configuración → Ventana y colores → Colores de la app:** Claro, Oscuro o Como Windows. Se aplica en el momento y queda guardado.

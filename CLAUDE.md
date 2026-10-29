@@ -48,7 +48,7 @@ Para ver la app: `.venv\Scripts\python.exe -m appfacturas ui` (si ya hay una abi
 ## Después de cada cambio
 
 1. Correr las dos tandas de tests.
-2. Subir la versión en `app/appfacturas/__init__.py` (0.x.y: y para arreglos, x para funciones nuevas).
+2. Subir la versión en `app/appfacturas/__init__.py` (b0.x.y desde la beta, por ejemplo `b0.20.0`: y para arreglos, x para funciones nuevas).
 3. Si cambia algo que ve el usuario, actualizar `docs/DOCUMENTACION.md`, `README.md` y, si hace falta, la guía PDF.
 4. `git add` solo de lo que corresponde, revisar `git diff --cached --stat`, commit con mensaje claro en español y **`git push origin main`** (Matheo pidió que los cambios se suban solos).
 5. Decirle a Matheo qué cambió y dónde quedaron los archivos. Si cambió algún `requirements*.txt`, recordarle correr `Instalar o actualizar RUA EZ-Fac.bat`; si no, alcanza con tocar Salir y abrir la app de nuevo.

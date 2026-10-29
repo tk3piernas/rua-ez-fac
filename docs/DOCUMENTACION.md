@@ -1,6 +1,6 @@
 # RUA EZ-Fac: documentación técnica
 
-Versión 0.19.6 (alpha, 28/10/2026). La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
+Versión b0.20.0 (beta, 28/10/2026). Desde la beta, las versiones se numeran `b0.x.y`. La app reemplaza a `OrdenarFacturas.ps1` y a la carga manual con Claude de las facturas de proveedores de RUA Asistencia (áreas Vehicular, Hogar, Persona y ServiciosYa; la lista está en `config.AREAS`).
 
 ## Qué hace
 
@@ -116,6 +116,7 @@ Estructura de la carpeta de la app:
    - archivos que esperan hace más de 7 días en `_Entrada`.
    Botón **Copiar informe** para pegarlo en un mail o chat.
 5. **Proveedores** (`maestro.py`): memoria de datos de proveedores en `PROVEEDORES RUA.xlsx`.
+   - Lista de la memoria con Área, Proveedor, CUIT, Banco, CBU, Alias, Contacto, **Teléfono** y **Email** (columnas G y H de la hoja Proveedores; ya existían, la planilla no cambió). Clic en un teléfono: lo copia. Clic en un email: abre un mail nuevo. Varios teléfonos o mails van en la misma celda separados por " / ".
    - Cuadro para pegar texto (mail, WhatsApp, .txt): lo lee el mismo lector de los .txt y arma una ficha editable con chequeos (dígito verificador de CUIT y CBU, banco del CBU). Si el proveedor ya está, muestra qué cambia.
    - Guardar escribe por Excel (COM), una fila por proveedor (clave CUIT, o el nombre si no tiene CUIT); los campos vacíos nunca borran. CUIT, teléfono, N° de cuenta y CBU van como texto. Necesita el modo "Cargar en la planilla real" o "Practicar en la carpeta de prueba".
    - Al leer un lote, los proveedores que no están en la hoja Proveedores de la planilla toman sus datos de la memoria. Al confirmar, los datos de los .txt (y lo que se sacó de las facturas, solo para completar vacíos) se guardan en la memoria; deshacer el lote los vuelve atrás.
@@ -130,7 +131,7 @@ Estructura de la carpeta de la app:
    - **Empezar la planilla de cero** (reset, ver abajo).
    - Una fila por ítem o una por factura; escribir el servicio en la columna C.
 - Al abrir, si hay otra versión de la app escuchando en el puerto, la cierra; solo si la línea de comando del proceso es Python con `appfacturas` (otro programa en el mismo puerto no se toca).
-- Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. En el encabezado, al lado del nombre, un cartel ALPHA con la foto de Simba ("¡Esto es una alpha! Mandá bugs y sugerencias a Matheo" al pasar el mouse).
+- Diseño: colores de RUA (azul #14147a y naranja #ff542c), cada parte en una tarjeta blanca con línea de color arriba. En el encabezado, al lado del nombre, un cartel BETA con la foto de Simba ("¡Esto es una beta! Mandá bugs y sugerencias a Matheo" al pasar el mouse) y la versión (`b0.x.y`).
 - Las tareas largas (rearmar la carpeta de prueba, guardar la memoria, deshacer, exportar, reintentar, Setup, volver del reset) muestran un aviso con ruedita mientras corren, y los botones de acción quedan deshabilitados hasta que terminan.
 - Cambiar de modo de trabajo con un lote leído sin confirmar pide confirmación (se descarta lo editado en la grilla). La pestaña Proveedores se actualiza sola con el modo.
 

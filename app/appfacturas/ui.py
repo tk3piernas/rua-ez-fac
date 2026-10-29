@@ -403,8 +403,8 @@ def pagina():
             ui.image("/ezfac/logo.png").classes("ez-logo w-10 h-10")
             with ui.column().classes("gap-0"):
                 ui.label(NOMBRE).classes("text-xl font-bold leading-tight")
-                ui.label(f"Carga de facturas de proveedores · v{__version__}").classes("text-xs opacity-75")
-            aviso_alfa()
+                ui.label(f"Carga de facturas de proveedores · {__version__}").classes("text-xs opacity-75")
+            aviso_beta()
             with ui.row().classes("items-center gap-1 ml-4").props("data-tour=planilla"):
                 ui.button("Abrir planilla", icon="table_view", on_click=abrir_planilla).props("flat color=white").tooltip(
                     "Abre en Excel la planilla en la que está escribiendo la app (la real o la copia de prueba)")
@@ -508,12 +508,12 @@ def aviso_para_leer() -> None:
                                                                 if nuevos else "") + ". Clic: ir a Cargar y leerlos.")
 
 
-def aviso_alfa() -> None:
+def aviso_beta() -> None:
     with ui.row().classes("alfa items-center gap-2 no-wrap"):
         ui.image("/ezfac/simba.png").classes("w-7 h-7 rounded-full").props("fit=cover")
-        ui.label("ALPHA").classes("font-bold text-xs")
+        ui.label("BETA").classes("font-bold text-xs")
         with ui.tooltip().classes("text-sm"):
-            ui.label("¡Esto es una alpha! Mandá bugs y sugerencias a Matheo.")
+            ui.label("¡Esto es una beta! Mandá bugs y sugerencias a Matheo.")
 
 
 # ------------------------------------------------------------------ Cargar
@@ -1356,6 +1356,20 @@ def historiales_memoria() -> list[Path]:
     return [hist_memoria()] + sorted((datos() / "lotes").glob(f"*/{ejecutor.HIST_MEMORIA}"))
 
 
+def contacto_clic(a: dict) -> None:
+    """Provider list: a phone is copied, an email opens a new mail (several ones go as 'a / b')."""
+    col, valor = a.get("colId") or (a.get("column") or {}).get("colId"), str(a.get("value") or "").strip()
+    if not valor or col not in ("telefono", "email"):
+        return
+    if col == "telefono":
+        ui.clipboard.write(valor)
+        ui.notify(f"Teléfono copiado: {valor}", type="positive")
+    elif sys.platform == "win32":
+        import os
+        from urllib.parse import quote
+        os.startfile("mailto:" + ",".join(quote(m.strip(), safe="@.+-_") for m in valor.split("/") if m.strip()))
+
+
 @ui.refreshable
 def panel_proveedores():
     """Paste a provider's details, check them and keep them in PROVEEDORES RUA.xlsx (the provider memory)."""
@@ -1467,16 +1481,23 @@ def panel_proveedores():
             if mem:
                 filas = [{"area": m["valores"][0], "nombre": m["valores"][1], "cuit": m["valores"][2],
                           "banco": m["valores"][8], "cbu": m["valores"][11], "alias": m["valores"][12],
-                          "contacto": m["valores"][5]} for m in mem.values()]
-                ui.aggrid({"columnDefs": [{"field": "area", "headerName": "Área", "width": 100},
-                                          {"field": "nombre", "headerName": "Proveedor", "flex": 1, "minWidth": 200},
-                                          {"field": "cuit", "headerName": "CUIT", "width": 120},
-                                          {"field": "banco", "headerName": "Banco", "width": 150},
-                                          {"field": "cbu", "headerName": "CBU / CVU", "width": 190},
-                                          {"field": "alias", "headerName": "Alias", "width": 150},
-                                          {"field": "contacto", "headerName": "Contacto", "width": 150}],
-                           "defaultColDef": {"filter": True, "sortable": True}, "rowData": filas},
-                          theme="balham").classes("w-full").style(f"height: {min(500, 64 + 28 * len(filas))}px")
+                          "contacto": m["valores"][5], "telefono": m["valores"][6], "email": m["valores"][7]}
+                         for m in mem.values()]
+                grilla = ui.aggrid({"columnDefs": [
+                    {"field": "area", "headerName": "Área", "width": 100},
+                    {"field": "nombre", "headerName": "Proveedor", "flex": 1, "minWidth": 200},
+                    {"field": "cuit", "headerName": "CUIT", "width": 120},
+                    {"field": "banco", "headerName": "Banco", "width": 150},
+                    {"field": "cbu", "headerName": "CBU / CVU", "width": 190},
+                    {"field": "alias", "headerName": "Alias", "width": 150},
+                    {"field": "contacto", "headerName": "Contacto", "width": 150},
+                    {"field": "telefono", "headerName": "Teléfono", "width": 130,
+                     "headerTooltip": "Clic en un teléfono: lo copia"},
+                    {"field": "email", "headerName": "Email", "width": 200,
+                     "headerTooltip": "Clic en un email: abre un mail nuevo"}],
+                    "defaultColDef": {"filter": True, "sortable": True}, "rowData": filas},
+                    theme="balham").classes("w-full").style(f"height: {min(500, 64 + 28 * len(filas))}px")
+                grilla.on("cellClicked", lambda e: contacto_clic(e.args))
             with ui.row().classes("gap-3"):
                 if r and r.is_file() and sys.platform == "win32":
                     import os
